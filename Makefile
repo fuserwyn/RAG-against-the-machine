@@ -18,7 +18,7 @@ INDEX_FLAGS = $(if $(filter semantic hybrid,$(MODE)),--semantic,)
 
 .PHONY: install run debug clean lint lint-strict index update search \
 	evaluate answer compare serve test test-fast school purge \
-	local local-stop up down logs rebuild ps
+	langchain qdrant local local-stop up down logs rebuild ps
 
 install:
 	uv sync
@@ -36,6 +36,14 @@ run: index search evaluate
 
 index:
 	$(CLI) index --max_chunk_size $(CHUNK) $(INDEX_FLAGS)
+
+## LangChain BM25 index (visualizer column)
+langchain:
+	$(PY) -m src --backend langchain index --max_chunk_size $(CHUNK)
+
+## Qdrant vector index (visualizer column). Embeds every chunk.
+qdrant:
+	$(PY) -m src --backend qdrant index --max_chunk_size $(CHUNK)
 
 ## re-index only the files changed since the last build (bonus)
 update:

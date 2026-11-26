@@ -78,6 +78,7 @@ Makefile rules:
 | `make school` / `purge` | 42 computer: put the heavy data on sgoinfre / remove it |
 | `make run` | `index` + `search` (both public datasets) + `evaluate` |
 | `make index` / `search` / `evaluate` / `answer` | single pipeline steps |
+| `make langchain` / `qdrant` | build those indexes; the visualizer reads them |
 | `make update` | incremental re-index of the changed files (bonus) |
 | `make serve` | local HTTP API on `http://127.0.0.1:$(PORT)` (bonus) |
 | `make local` / `local-stop` | pipeline visualizer in the background, `http://127.0.0.1:8080` |

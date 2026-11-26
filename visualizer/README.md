@@ -16,9 +16,9 @@ make local-stop  # stop the server started by `make local`
 Index the backends you want to show first:
 
 ```bash
-uv run python -m src index
-uv run python -m src --backend langchain index
-uv run python -m src --backend qdrant index      # ~2 min (embeds every chunk)
+make index
+make langchain
+make qdrant          # ~2 min (embeds every chunk)
 ```
 
 ## Architecture
