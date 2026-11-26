@@ -4,16 +4,17 @@ An isometric, block-by-block view of this project's RAG pipeline. It runs the pr
 
 ## Run
 
+Every command below is run from the repository root, same place as `make school` and `make run`.
+
 ```bash
-make up      # Docker: build and start rag-engine + rag-viz, then open http://localhost:8080
+make up      # Docker: build and start rag-engine + rag-viz, then open http://127.0.0.1:8080
 make down
-make local   # no Docker: same server in the project's uv env, http://localhost:8080
+make local   # no Docker: same server in the project's uv env, http://127.0.0.1:8080
 ```
 
 Index the backends you want to show first:
 
 ```bash
-cd ..   # repository root
 uv run python -m src index
 uv run python -m src --backend langchain index
 uv run python -m src --backend qdrant index      # ~2 min (embeds every chunk)
@@ -33,4 +34,4 @@ browser ──:8080──▶ rag-viz (nginx) ──/api──▶ rag-engine:8000
 
 The embedded Qdrant storage can be open in one process only: while the visualizer has used the Qdrant backend, stop it before running `--backend qdrant` from the CLI.
 
-Run every command from `visualizer/`. The visualizer is a demo tool: the graded pipeline is the `src` CLI.
+Run these from the repository root. The visualizer is a demo tool: the graded pipeline is the `src` CLI.

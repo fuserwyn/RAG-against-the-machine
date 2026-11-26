@@ -17,7 +17,8 @@ OUT = data/output/$(BACKEND)-$(MODE)
 INDEX_FLAGS = $(if $(filter semantic hybrid,$(MODE)),--semantic,)
 
 .PHONY: install run debug clean lint lint-strict index update search \
-	evaluate answer compare serve test test-fast school purge
+	evaluate answer compare serve test test-fast school purge \
+	local up down logs rebuild ps
 
 install:
 	uv sync
@@ -72,6 +73,28 @@ compare:
 ## local HTTP API on http://127.0.0.1:$(PORT) (bonus)
 serve:
 	$(CLI) serve --port $(PORT)
+
+## pipeline visualizer, no Docker: http://127.0.0.1:8080
+local:
+	@echo "open http://127.0.0.1:8080"
+	PYTHONPATH=. $(PY) visualizer/engine/trace_server.py \
+		--host 127.0.0.1 --port 8080 --static visualizer/viz
+
+## same visualizer in Docker (compose file stays in visualizer/)
+up:
+	$(MAKE) -C visualizer up
+
+down:
+	$(MAKE) -C visualizer down
+
+logs:
+	$(MAKE) -C visualizer logs
+
+rebuild:
+	$(MAKE) -C visualizer rebuild
+
+ps:
+	$(MAKE) -C visualizer ps
 
 ## every test (corpus / model tests are skipped if data or weights are
 ## missing); test-fast skips them explicitly
