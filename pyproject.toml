@@ -28,7 +28,7 @@ dev = [
 ]
 
 [tool.mypy]
-exclude = ["data/", "\\.venv/"]
+exclude = ["data/", "\\.venv/", "moulinette/"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
