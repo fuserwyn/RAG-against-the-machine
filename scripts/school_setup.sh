@@ -2,8 +2,7 @@
 # One-shot setup on a 42 school computer (Linux, small home quota, big /sgoinfre).
 #
 #   git clone <repo> rag-against-the-machine && cd rag-against-the-machine
-#   # put vllm-0.10.1.zip and datasets_public.zip here (or anywhere in $HOME)
-#   make school                 # setup, weights, index, search, evaluate
+#   make school                 # downloads the corpus, then index, search, evaluate
 #
 #   make purge                  # after the defense: venv, corpus, caches. The clone stays.
 #
@@ -34,7 +33,7 @@ while [[ $# -gt 0 ]]; do
     --no-prefetch) PREFETCH=0; shift ;;
     --yes|-y) YES=1; shift ;;
     --uninstall) UNINSTALL=1; shift ;;
-    -h|--help) sed -n '2,24p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,23p' "$0"; exit 0 ;;
     *) echo "unknown option $1 (see --help)"; exit 2 ;;
   esac
 done
@@ -275,8 +274,15 @@ elif zip=$(find_zip vllm-0.10.1.zip); then
   extract "$zip" "$ROOT/data/raw"
   ok "corpus from $zip"
 else
-  missing=1
-  warn "no vllm-0.10.1.zip"
+  say "downloading vLLM 0.10.1"
+  tmp=$(mktemp -d)
+  curl -fL --retry 3 -o "$tmp/vllm.zip" \
+    "https://github.com/vllm-project/vllm/archive/refs/tags/v0.10.1.zip" \
+    || die "could not download vLLM 0.10.1"
+  extract "$tmp/vllm.zip" "$ROOT/data/raw"
+  rm -rf "$tmp"
+  [[ -f "$ROOT/data/raw/vllm-0.10.1/README.md" ]] || die "vLLM archive has no vllm-0.10.1/README.md"
+  ok "corpus from GitHub v0.10.1 (same tree as the subject zip)"
 fi
 if [[ -f "$ROOT/data/datasets/AnsweredQuestions/dataset_docs_public.json" ]]; then
   ok "datasets already in data/datasets"
@@ -287,9 +293,11 @@ elif zip=$(find_zip datasets_public.zip); then
   cp -a "$tmp/datasets_public/public/." "$ROOT/data/datasets/"
   rm -rf "$tmp"
   ok "datasets from $zip"
+elif [[ -d "$ROOT/assets/datasets/AnsweredQuestions" ]]; then
+  cp -a "$ROOT/assets/datasets/." "$ROOT/data/datasets/"
+  ok "datasets from assets/datasets"
 else
-  missing=1
-  warn "no datasets_public.zip"
+  die "no public datasets (assets/datasets is missing)"
 fi
 if [[ -x "$ROOT/moulinette" ]]; then
   ok "moulinette"
@@ -307,11 +315,6 @@ elif zip=$(find_zip moulinette.zip); then
   ok "moulinette ($bin) -> ./moulinette"
 else
   warn "no moulinette.zip — the defense uses the staff binary; yours is only for a local check"
-fi
-
-if [[ "${missing:-0}" == 1 && $PREFETCH == 1 ]]; then
-  die "put vllm-0.10.1.zip and datasets_public.zip in this directory
-  (they are the intra attachments; they are not in git) and run make school again"
 fi
 
 # ------------------------------------------------------------------ 7. install, weights, index, evaluate
