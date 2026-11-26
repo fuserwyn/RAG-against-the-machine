@@ -18,7 +18,7 @@
 # symlinks), and the uv / Hugging Face caches are symlinked out of home.
 #
 # Options
-#   --sgo DIR      cache folder (default /sgoinfre/goinfre/Perso/$USER/rag-cache)
+#   --sgo DIR      cache folder (default: the first writable goinfre/$USER/rag-cache)
 #   --zips DIR     folder that holds vllm-0.10.1.zip and datasets_public.zip
 #   --no-prefetch  do not uv sync, download weights or index in the background
 #   --yes          do not ask before moving the clone out of home
@@ -27,9 +27,7 @@ set -uo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"; cd "$ROOT"
 ARGS=("$@")
-SGO_BASE="/sgoinfre/goinfre/Perso/$USER"
 CACHE=""; ZIPS=""; PREFETCH=1; YES=0; UNINSTALL=0
-REPO_DEST="$SGO_BASE/rag-against-the-machine"
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --sgo) CACHE="$2"; shift 2 ;;
@@ -41,8 +39,41 @@ while [[ $# -gt 0 ]]; do
     *) echo "unknown option $1 (see --help)"; exit 2 ;;
   esac
 done
-CACHE="${CACHE:-$SGO_BASE/rag-cache}"
-STATE="$CACHE/state"; LOGS="$CACHE/logs"
+
+# Campuses do not mount the big disk in the same place. Use a directory that
+# already exists and is writable; never try to create /sgoinfre itself.
+find_goinfre() {
+  local dir parent
+  local -a found=()
+  local -a candidates=(
+    "/sgoinfre/goinfre/Perso/$USER"
+    "/sgoinfre/students/$USER"
+    "/sgoinfre/$USER"
+    "/goinfre/$USER"
+    "$HOME/sgoinfre"
+    "$HOME/goinfre"
+  )
+  for dir in "${candidates[@]}"; do
+    [[ -d "$dir" && -w "$dir" ]] || continue
+    if [[ -f "$dir/rag-cache/state/done" ]]; then
+      echo "$dir"
+      return 0
+    fi
+    found+=("$dir")
+  done
+  if [[ ${#found[@]} -gt 0 ]]; then
+    echo "${found[0]}"
+    return 0
+  fi
+  for parent in /sgoinfre/goinfre/Perso /sgoinfre/students /sgoinfre /goinfre; do
+    [[ -d "$parent" && -w "$parent" ]] || continue
+    mkdir -p "$parent/$USER" && chmod 700 "$parent/$USER" || continue
+    echo "$parent/$USER"
+    return 0
+  done
+  return 1
+}
+
 G=$'\e[32m'; R=$'\e[31m'; Y=$'\e[33m'; B=$'\e[1m'; N=$'\e[0m'
 say()  { echo "${B}==>${N} $*"; }
 ok()   { echo "  ${G}ok${N}  $*"; }
@@ -53,6 +84,18 @@ mark() { mkdir -p "$STATE"; echo "$1" >> "$STATE/done"; }
 did()  { [[ -f "$STATE/done" ]] && grep -qx "$1" "$STATE/done"; }
 phys() { (cd "$1" && pwd -P); }
 T0=$SECONDS
+
+if [[ -n "$CACHE" ]]; then
+  SGO_BASE="$(dirname "$CACHE")"
+else
+  SGO_BASE="$(find_goinfre)" || die "no writable goinfre for $USER
+  Looked for /sgoinfre/goinfre/Perso/$USER, /sgoinfre/students/$USER,
+  /sgoinfre/$USER, /goinfre/$USER, ~/sgoinfre and ~/goinfre.
+  Create your folder there (chmod 700) or rerun with --sgo DIR"
+  CACHE="$SGO_BASE/rag-cache"
+fi
+REPO_DEST="$SGO_BASE/rag-against-the-machine"
+STATE="$CACHE/state"; LOGS="$CACHE/logs"
 
 # Drop a home path that we created and that points into the cache or the moved clone.
 unlink_if_ours() {
@@ -99,9 +142,8 @@ fi
 # ------------------------------------------------------------------ 1. places
 say "1. Folders"
 [[ "$(uname -s)" == Linux ]] || warn "not Linux: fine for a dry run, the script targets the school computers"
-if [[ ! -d "$SGO_BASE" ]]; then
-  mkdir -p "$SGO_BASE" 2>/dev/null || die "cannot create $SGO_BASE — is /sgoinfre mounted? use --sgo DIR"
-fi
+[[ -d "$SGO_BASE" && -w "$SGO_BASE" ]] || die "cannot write $SGO_BASE — pass --sgo DIR"
+ok "goinfre: $SGO_BASE"
 mkdir -p "$CACHE" "$LOGS" "$STATE" || die "cannot write $CACHE"
 chmod 700 "$CACHE" 2>/dev/null || true
 did setup || mark setup

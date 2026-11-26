@@ -48,16 +48,17 @@ weights. From the clone:
 
 ```bash
 # put vllm-0.10.1.zip and datasets_public.zip in the clone, or pass --zips DIR
-make school           # ./scripts/school_setup.sh
-tail -f /sgoinfre/goinfre/Perso/$USER/rag-cache/logs/prefetch.log
+make school           # ./scripts/school_setup.sh ; it prints the log path
 make run              # once that log prints ALL DONE
 make purge            # after the defense: venv, corpus, weights. The clone stays
 ```
 
-`make school` moves the clone to `/sgoinfre/goinfre/Perso/$USER` (a symlink
-stays at the old path) and points the uv cache, the Python install and the
-Hugging Face cache there. After that, `uv sync` and `uv run python -m src ...`
-from the subject write outside home. `./scripts/school_setup.sh --help` lists
+`make school` finds a writable goinfre (`/sgoinfre/goinfre/Perso/$USER`,
+`/sgoinfre/students/$USER`, `/sgoinfre/$USER` or `/goinfre/$USER`), moves the
+clone there (a symlink stays at the old path) and points the uv cache, the
+Python install and the Hugging Face cache there. After that, `uv sync` and
+`uv run python -m src ...` from the subject write outside home.
+`./scripts/school_setup.sh --help` lists
 `--sgo`, `--zips`, `--no-prefetch` and `--yes`.
 
 Expected layout (data is not versioned):
