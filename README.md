@@ -79,12 +79,15 @@ Makefile rules:
 | `make run` | `index` + `search` (both public datasets) + `evaluate` |
 | `make index` / `search` / `evaluate` / `answer` | single pipeline steps |
 | `make langchain` / `qdrant` | build those indexes; the visualizer reads them |
-| `make update` | incremental re-index of the changed files (bonus) |
-| `make serve` | local HTTP API on `http://127.0.0.1:$(PORT)` (bonus) |
+| `make semantic` | bonus: MiniLM embeddings next to BM25 |
+| `make hybrid` | bonus: one hybrid search (`QUERY`, `K`) |
+| `make update` / `incremental` | bonus: re-index only the changed files |
+| `make cache` | bonus: the same hybrid query twice |
+| `make serve` | bonus: local HTTP API on `http://127.0.0.1:$(PORT)` |
 | `make local` / `local-stop` | pipeline visualizer in the background, `http://127.0.0.1:8080` |
 | `make up` / `down` | same visualizer in Docker |
 | `make compare` | `run` with both backends |
-| `make run MODE=semantic` / `MODE=hybrid` | build embeddings too and search with them (bonus) |
+| `make run MODE=semantic` / `MODE=hybrid` | `run`, but build embeddings too and search with them |
 | `make debug` | run the indexer under `pdb` |
 | `make clean` | remove caches |
 | `make lint` / `make lint-strict` | flake8 + mypy |

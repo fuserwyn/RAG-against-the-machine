@@ -4,12 +4,14 @@
 
 # Usage: make <rule> [BACKEND=native|langchain]
 #                    [MODE=lexical|semantic|hybrid] [K=10] [CHUNK=2000]
+#                    [QUERY=reduce GPU memory]
 BACKEND ?= native
 MODE ?= lexical
 K ?= 10
 CHUNK ?= 2000
 PORT ?= 8000
 SCOPE ?= UnansweredQuestions
+QUERY ?= reduce GPU memory
 PY = uv run python
 CLI = $(PY) -m src --backend $(BACKEND) --mode $(MODE)
 DATASETS = data/datasets
@@ -18,7 +20,8 @@ INDEX_FLAGS = $(if $(filter semantic hybrid,$(MODE)),--semantic,)
 
 .PHONY: install run debug clean lint lint-strict index update search \
 	evaluate answer compare serve test test-fast school purge \
-	langchain qdrant local local-stop up down logs rebuild ps
+	langchain qdrant semantic hybrid incremental cache \
+	local local-stop up down logs rebuild ps
 
 install:
 	uv sync
@@ -48,6 +51,24 @@ qdrant:
 ## re-index only the files changed since the last build (bonus)
 update:
 	$(CLI) index --max_chunk_size $(CHUNK) $(INDEX_FLAGS) --incremental
+
+## bonus: MiniLM embeddings next to the BM25 index
+semantic:
+	$(PY) -m src index --max_chunk_size $(CHUNK) --semantic
+
+## bonus: one hybrid search; run `make semantic` first
+hybrid:
+	$(PY) -m src --mode hybrid search "$(QUERY)" --k $(K)
+
+## bonus: same as `make update`
+incremental: update
+
+## bonus: the same hybrid query twice; the second one is cached
+cache:
+	@echo "== first query"
+	$(PY) -m src --mode hybrid search "$(QUERY)" --k $(K)
+	@echo "== same query again"
+	$(PY) -m src --mode hybrid search "$(QUERY)" --k $(K)
 
 search:
 	@for ds in code docs; do \
