@@ -54,9 +54,10 @@ make purge            # after the defense: venv, corpus, weights. The clone stay
 ```
 
 `make school` finds a writable goinfre (`/sgoinfre/goinfre/Perso/$USER`,
-`/sgoinfre/students/$USER`, `/sgoinfre/$USER` or `/goinfre/$USER`), moves the
-clone there (a symlink stays at the old path) and points the uv cache, the
-Python install and the Hugging Face cache there. After that, `uv sync` and
+`/sgoinfre/students/$USER`, `/sgoinfre/$USER` or `/goinfre/$USER`). The clone
+stays where it is. The uv cache, the Python install, the Hugging Face cache
+and, when the clone is on the home disk, `.venv` and `data/` are symlinks
+onto that goinfre. After that, `uv sync` and
 `uv run python -m src ...` from the subject write outside home.
 `./scripts/school_setup.sh --help` lists
 `--sgo`, `--zips`, `--no-prefetch` and `--yes`.

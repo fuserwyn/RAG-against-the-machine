@@ -151,27 +151,21 @@ ok "caches in $CACHE ($(df -h "$CACHE" | awk 'NR==2{print $4}') free), home has 
 free_kb=$(df -Pk "$CACHE" | awk 'NR==2{print $4}')
 [[ "${free_kb:-0}" -ge 8000000 ]] || warn "less than 8 GB free on $CACHE — PyTorch and Qwen3 need about that"
 
-# ------------------------------------------------------------------ 2. clone out of home
+# ------------------------------------------------------------------ 2. clone stays put
+# Moving the clone onto goinfre deletes it on the home filesystem (mv across
+# devices). The shell is still inside that directory, so the next `make`
+# dies with "getcwd: No such file or directory". Heavy files are symlinks.
 say "2. Clone"
 root_phys=$(phys "$ROOT")
-case "$root_phys/" in
-  "$REPO_DEST/"*) ok "clone is already on sgoinfre ($root_phys)" ;;
-  "$HOME"/*)
-    warn "this clone is in home; a plain uv sync would put PyTorch there"
-    if ask "move it to $REPO_DEST and leave a symlink here?"; then
-      [[ -e "$REPO_DEST" ]] && die "$REPO_DEST already exists"
-      mv "$root_phys" "$REPO_DEST"
-      ln -s "$REPO_DEST" "$root_phys"
-      echo "$root_phys" > "$STATE/repo-link"
-      mark repo-moved
-      ok "clone moved to $REPO_DEST"
-      exec "$REPO_DEST/scripts/school_setup.sh" "${ARGS[@]}"
-    else
-      warn "kept in home: .venv and data/ will be symlinks into $CACHE"
-      mark repo-stayed
-    fi ;;
-  *) ok "clone is outside home ($root_phys); leaving it there" ;;
-esac
+goinfre_dev=$(df -P "$SGO_BASE" | awk 'NR==2{print $1}')
+clone_dev=$(df -P "$root_phys" | awk 'NR==2{print $1}')
+if [[ "$clone_dev" == "$goinfre_dev" ]]; then
+  ok "clone is on the goinfre disk ($root_phys)"
+else
+  ok "clone stays at $root_phys"
+  ok ".venv and data/ go to $CACHE, so PyTorch is not stored in home"
+  mark repo-stayed
+fi
 
 # A home path that must not hold gigabytes. Existing directories are moved, not copied.
 link_out() {
