@@ -2,9 +2,8 @@
 # One-shot setup on a 42 school computer (Linux, small home quota, big /sgoinfre).
 #
 #   git clone <repo> rag-against-the-machine && cd rag-against-the-machine
-#   # put vllm-0.10.1.zip and datasets_public.zip here, or pass --zips DIR
-#   make school                 # or: ./scripts/school_setup.sh
-#   make run                    # index + search + evaluate, once the log says ALL DONE
+#   # put vllm-0.10.1.zip and datasets_public.zip here (or anywhere in $HOME)
+#   make school                 # setup, weights, index, search, evaluate
 #
 #   make purge                  # after the defense: venv, corpus, caches. The clone stays.
 #
@@ -20,8 +19,8 @@
 # Options
 #   --sgo DIR      cache folder (default: the first writable goinfre/$USER/rag-cache)
 #   --zips DIR     folder that holds vllm-0.10.1.zip and datasets_public.zip
-#   --no-prefetch  do not uv sync, download weights or index in the background
-#   --yes          do not ask before moving the clone out of home
+#   --no-prefetch  only prepare folders and unpack the zips
+#   --yes          do not ask before moving a cache out of home
 #   --uninstall    remove the venv, the corpus and the caches (the clone is kept)
 set -uo pipefail
 
@@ -35,7 +34,7 @@ while [[ $# -gt 0 ]]; do
     --no-prefetch) PREFETCH=0; shift ;;
     --yes|-y) YES=1; shift ;;
     --uninstall) UNINSTALL=1; shift ;;
-    -h|--help) sed -n '2,25p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,24p' "$0"; exit 0 ;;
     *) echo "unknown option $1 (see --help)"; exit 2 ;;
   esac
 done
@@ -251,13 +250,16 @@ export HUGGINGFACE_HUB_CACHE="$CACHE/hf/hub"
 # ------------------------------------------------------------------ 6. attachments
 say "5. Corpus and datasets"
 find_zip() {
-  local base="$1" dir
+  local base="$1" dir hit
   local -a dirs=()
   [[ -n "$ZIPS" ]] && dirs+=("$ZIPS")
-  dirs+=("$ROOT" "$ROOT/.." "$HOME/Downloads")
+  dirs+=("$ROOT" "$ROOT/.." "$HOME/Downloads" "$HOME/Desktop" "$SGO_BASE")
   for dir in "${dirs[@]}"; do
     [[ -f "$dir/$base" ]] && echo "$dir/$base" && return 0
   done
+  hit=$(find "$HOME" "$SGO_BASE" -maxdepth 5 -type f -name "$base" \
+    -not -path '*/.venv/*' -not -path '*/rag-cache/*' 2>/dev/null | head -1)
+  [[ -n "$hit" ]] && echo "$hit" && return 0
   return 1
 }
 extract() {
@@ -273,7 +275,8 @@ elif zip=$(find_zip vllm-0.10.1.zip); then
   extract "$zip" "$ROOT/data/raw"
   ok "corpus from $zip"
 else
-  warn "no vllm-0.10.1.zip — put it in the clone or pass --zips DIR, then re-run"
+  missing=1
+  warn "no vllm-0.10.1.zip"
 fi
 if [[ -f "$ROOT/data/datasets/AnsweredQuestions/dataset_docs_public.json" ]]; then
   ok "datasets already in data/datasets"
@@ -285,7 +288,8 @@ elif zip=$(find_zip datasets_public.zip); then
   rm -rf "$tmp"
   ok "datasets from $zip"
 else
-  warn "no datasets_public.zip — search_dataset needs data/datasets"
+  missing=1
+  warn "no datasets_public.zip"
 fi
 if [[ -x "$ROOT/moulinette" ]]; then
   ok "moulinette"
@@ -305,55 +309,37 @@ else
   warn "no moulinette.zip — the defense uses the staff binary; yours is only for a local check"
 fi
 
-# ------------------------------------------------------------------ 7. background install, weights, index
+if [[ "${missing:-0}" == 1 && $PREFETCH == 1 ]]; then
+  die "put vllm-0.10.1.zip and datasets_public.zip in this directory
+  (they are the intra attachments; they are not in git) and run make school again"
+fi
+
+# ------------------------------------------------------------------ 7. install, weights, index, evaluate
 if [[ $PREFETCH == 1 ]]; then
-  say "6. Prefetch"
-  if [[ -f "$STATE/prefetch.pid" ]] && kill -0 "$(cat "$STATE/prefetch.pid")" 2>/dev/null; then
-    ok "already running (pid $(cat "$STATE/prefetch.pid")) — tail -f $LOGS/prefetch.log"
-  else
-    nohup env \
-      PATH="$PATH" \
-      UV_CACHE_DIR="$UV_CACHE_DIR" \
-      UV_PYTHON_INSTALL_DIR="$UV_PYTHON_INSTALL_DIR" \
-      HF_HOME="$HF_HOME" \
-      HF_HUB_CACHE="$HF_HUB_CACHE" \
-      HUGGINGFACE_HUB_CACHE="$HUGGINGFACE_HUB_CACHE" \
-      ROOT="$ROOT" \
-      bash -c '
-        set -uo pipefail
-        cd "$ROOT"
-        echo "uv sync"
-        uv sync && echo "done sync" || { echo "FAILED sync"; exit 1; }
-        echo "download Qwen/Qwen3-0.6B"
-        uv run python -c "from huggingface_hub import snapshot_download; snapshot_download(\"Qwen/Qwen3-0.6B\")" \
-          && echo "done qwen" || echo "FAILED qwen"
-        echo "download all-MiniLM-L6-v2"
-        uv run python -c "from huggingface_hub import snapshot_download; snapshot_download(\"sentence-transformers/all-MiniLM-L6-v2\")" \
-          && echo "done minilm" || echo "FAILED minilm"
-        if [[ -f data/raw/vllm-0.10.1/README.md ]]; then
-          echo "index"
-          uv run python -m src index --max_chunk_size 2000 && echo "done index" || echo "FAILED index"
-        else
-          echo "skip index (no corpus)"
-        fi
-        echo "ALL DONE"
-      ' > "$LOGS/prefetch.log" 2>&1 &
-    echo $! > "$STATE/prefetch.pid"
-    ok "uv sync, Qwen3, MiniLM and the index are running in the background"
-    ok "progress: tail -f $LOGS/prefetch.log"
-  fi
+  say "6. Install, models, index, evaluate"
+  cd "$ROOT"
+  uv sync || die "uv sync failed"
+  ok "dependencies"
+  uv run python -c 'from huggingface_hub import snapshot_download; snapshot_download("Qwen/Qwen3-0.6B"); snapshot_download("sentence-transformers/all-MiniLM-L6-v2")' \
+    || die "could not download Qwen3 or MiniLM"
+  ok "Qwen3-0.6B and MiniLM"
+  uv run python -m src index --max_chunk_size 2000 || die "index failed"
+  ok "index"
+  for ds in code docs; do
+    uv run python -m src search_dataset \
+      --dataset_path "data/datasets/UnansweredQuestions/dataset_${ds}_public.json" \
+      --k 5 \
+      --save_directory "data/output/search_results/UnansweredQuestions" \
+      || die "search failed on $ds"
+    echo "== $ds"
+    uv run python -m src evaluate \
+      --student_search_results_path "data/output/search_results/UnansweredQuestions/dataset_${ds}_public.json" \
+      --dataset_path "data/datasets/AnsweredQuestions/dataset_${ds}_public.json" \
+      || die "evaluate failed on $ds"
+  done
 fi
 
 # ------------------------------------------------------------------ summary
 echo
 say "Ready in $((SECONDS - T0)) s.  Clone: $(phys "$ROOT")"
-cat <<EOF
-
-  ${B}make run${N}       # after the log prints ALL DONE: index (if needed) + search + evaluate
-  make test      # pytest
-  tail -f $LOGS/prefetch.log
-  make purge     # when you leave: venv, corpus, weights, uv cache. The clone stays.
-
-  The subject commands work in this shell and in a new one:
-    uv run python -m src index --max_chunk_size 2000
-EOF
+echo "  make purge    # when you leave: venv, corpus, weights, uv cache. The clone stays."

@@ -47,9 +47,8 @@ On a 42 computer the home quota is too small for PyTorch and the model
 weights. From the clone:
 
 ```bash
-# put vllm-0.10.1.zip and datasets_public.zip in the clone, or pass --zips DIR
-make school           # ./scripts/school_setup.sh ; it prints the log path
-make run              # once that log prints ALL DONE
+# put vllm-0.10.1.zip and datasets_public.zip in the clone (intra attachments)
+make school           # goinfre, dependencies, models, index, search, evaluate
 make purge            # after the defense: venv, corpus, weights. The clone stays
 ```
 
