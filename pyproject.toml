@@ -1,0 +1,39 @@
+[project]
+name = "rag-against-the-machine"
+version = "1.0.0"
+description = "Retrieval-Augmented Generation over the vLLM codebase"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "fire>=0.6",
+    "langchain-community>=0.3",
+    "langchain-text-splitters>=0.3",
+    "mcp>=2.3,<3",
+    "numpy>=1.26",
+    "pydantic>=2.6",
+    "qdrant-client>=1.12",
+    "rank-bm25>=0.2.2",
+    "scipy>=1.11",
+    "torch>=2.2",
+    "tqdm>=4.66",
+    "transformers>=4.51",
+]
+
+[dependency-groups]
+dev = [
+    "flake8>=7.0",
+    "mypy>=1.10",
+    "pytest>=8.0",
+    "types-tqdm",
+]
+
+[tool.mypy]
+exclude = ["data/", "\\.venv/"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+markers = [
+    "corpus: needs the vLLM corpus and the datasets under data/",
+    "model: loads a Hugging Face model (needs the downloaded weights)",
+]

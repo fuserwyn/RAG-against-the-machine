@@ -1,0 +1,1615 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RAG Blocks</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;700&display=swap">
+<style>
+/* Layout: control bar on top; isometric pipeline (left) + stage inspector (right); docker topology + index stats below */
+:root {
+  --bg: #eef1f4; --surface: #ffffff; --surface-2: #f5f7f9; --fg: #16202b; --muted: #5d6874;
+  --line: #c9d1d9; --edge: #7f8b97; --accent: #2f5bd3; --accent-soft: #e3eafb;
+  --good: #1f8a5b; --warn: #b5791a; --bad: #c2413a; --packet: #f0a020;
+  --display: "Space Grotesk", system-ui, sans-serif;
+  --body: "Inter", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f141a; --surface: #171e26; --surface-2: #1d2630; --fg: #e5eaf0; --muted: #96a2ae;
+  --line: #2b3643; --edge: #5f6c79; --accent: #7c9cff; --accent-soft: #1f2b4d;
+  --good: #4cc38a; --warn: #e3a948; --bad: #ef6f66; --packet: #ffc04a; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0f141a; --surface: #171e26; --surface-2: #1d2630; --fg: #e5eaf0; --muted: #96a2ae;
+  --line: #2b3643; --edge: #5f6c79; --accent: #7c9cff; --accent-soft: #1f2b4d;
+  --good: #4cc38a; --warn: #e3a948; --bad: #ef6f66; --packet: #ffc04a; color-scheme: dark }
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--fg); font: 14px/1.5 var(--body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.wrap { max-width: 1440px; margin: 0 auto; padding-block: 20px 48px; display: grid; gap: 16px; }
+h1 { font: 700 1.5rem var(--display); margin: 0; letter-spacing: -.01em; }
+h2 { font: 600 1.1rem var(--display); margin: 0; }
+h3 { font: 600 .78rem var(--body); text-transform: uppercase; letter-spacing: .07em; color: var(--muted); margin: 14px 0 6px; }
+code, pre, .mono { font-family: var(--mono); font-size: 12px; }
+.bar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+.brand { display: flex; flex-direction: column; margin-right: 8px; }
+.brand small { color: var(--muted); }
+.seg { display: inline-flex; background: var(--surface-2); border: 1px solid var(--line); border-radius: 9px; padding: 3px; }
+.seg button { border: 0; background: transparent; color: var(--muted); font: 600 13px var(--body); padding: 6px 12px; border-radius: 7px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--fg); box-shadow: 0 1px 2px rgba(0,0,0,.15); }
+.seg button[data-b="native"][aria-pressed="true"] { color: #2c6fd6; }
+.seg button[data-b="langchain"][aria-pressed="true"] { color: #12957e; }
+.seg button[data-b="qdrant"][aria-pressed="true"] { color: #d0304a; }
+.vec { display: flex; align-items: center; gap: 1px; height: 64px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 4px 6px; }
+.vec span { flex: 1; min-width: 2px; border-radius: 1px; }
+.q { flex: 1 1 320px; min-width: 0; display: flex; gap: 8px; }
+.q input { flex: 1; min-width: 0; font: 14px var(--body); padding: 9px 12px; border-radius: 9px; border: 1px solid var(--line); background: var(--surface-2); color: var(--fg); }
+select { font: 13px var(--body); padding: 8px; border-radius: 9px; border: 1px solid var(--line); background: var(--surface-2); color: var(--fg); }
+label.chk { display: inline-flex; gap: 6px; align-items: center; color: var(--muted); font-size: 13px; cursor: pointer; }
+.btn { font: 600 14px var(--body); border: 0; border-radius: 9px; padding: 9px 16px; background: var(--accent); color: #fff; cursor: pointer; }
+.btn:disabled { opacity: .55; cursor: progress; }
+.btn.ghost { background: var(--surface-2); color: var(--fg); border: 1px solid var(--line); font-weight: 500; font-size: 13px; padding: 6px 10px; }
+button:focus-visible, input:focus-visible, select:focus-visible, .cube:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font: 12px var(--body); border: 1px solid var(--line); background: var(--surface); color: var(--muted); border-radius: 999px; padding: 3px 10px; cursor: pointer; }
+.chip:hover { color: var(--fg); border-color: var(--edge); }
+.main { display: grid; grid-template-columns: minmax(0, 1fr) 12px var(--panel-w, 440px); gap: 4px; align-items: start; }
+.gutter { position: relative; align-self: stretch; min-height: 200px; cursor: col-resize; touch-action: none; border-radius: 6px; outline: none; }
+.gutter::before { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; transform: translateX(-50%); background: var(--line); border-radius: 2px; transition: background .15s, width .15s; }
+.gutter::after { content: ""; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 6px; height: 36px; border-radius: 4px; background: var(--edge); opacity: .55; }
+.gutter:hover::before, .gutter:focus-visible::before, .gutter.drag::before { background: var(--accent); width: 4px; }
+.gutter:hover::after, .gutter.drag::after { background: var(--accent); opacity: 1; }
+body.resizing { cursor: col-resize; user-select: none; }
+@media (max-width: 1100px) { .main { grid-template-columns: minmax(0, 1fr); } .gutter { display: none; } }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; min-width: 0; }
+.scene { padding: 8px; overflow-x: auto; position: relative; }
+.scene svg { display: block; width: 100%; min-width: 760px; height: auto; }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; padding: 4px 12px 10px; color: var(--muted); font-size: 12px; }
+.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -2px; }
+.panel { padding: 16px 18px; max-height: calc(100vh - 140px); overflow: auto; position: sticky; top: 12px; }
+.panel .kicker { font: 600 11px var(--body); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.panel p { margin: 6px 0; color: var(--muted); max-width: 65ch; }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; font-variant-numeric: tabular-nums; }
+.kv dt { color: var(--muted); }
+.kv dd { margin: 0; font-weight: 500; }
+.tok { display: inline-block; font: 12px var(--mono); padding: 2px 7px; margin: 2px; border-radius: 6px; background: var(--surface-2); border: 1px solid var(--line); }
+.tok.miss { opacity: .5; text-decoration: line-through; }
+.tok small { color: var(--muted); margin-left: 4px; }
+.arrow { color: var(--muted); margin: 4px 0; }
+.hit { border: 1px solid var(--line); border-radius: 9px; padding: 8px 10px; margin-bottom: 8px; background: var(--surface-2); }
+.hit header { display: flex; gap: 8px; align-items: baseline; }
+.hit .rank { font: 700 13px var(--display); color: var(--accent); }
+.hit .path { font: 12px var(--mono); overflow-wrap: anywhere; flex: 1; }
+.hit .score { font: 600 12px var(--mono); }
+.sbar { height: 8px; border-radius: 4px; display: flex; overflow: hidden; background: var(--line); margin: 6px 0 4px; }
+.sbar span { display: block; height: 100%; }
+.terms { display: flex; flex-wrap: wrap; gap: 4px 10px; font: 11px var(--mono); color: var(--muted); }
+.terms b { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 4px; }
+details summary { cursor: pointer; color: var(--muted); font-size: 12px; margin-top: 4px; }
+pre { background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 10px; overflow: auto; max-height: 340px; white-space: pre-wrap; overflow-wrap: anywhere; margin: 6px 0; }
+.budget { display: flex; height: 22px; border-radius: 6px; overflow: hidden; border: 1px solid var(--line); background: var(--surface-2); }
+.budget span { display: flex; align-items: center; justify-content: center; font: 11px var(--mono); color: #fff; border-right: 1px solid var(--surface); white-space: nowrap; overflow: hidden; }
+.budget span.drop { background: repeating-linear-gradient(45deg, var(--line), var(--line) 4px, transparent 4px, transparent 8px) !important; color: var(--muted); }
+.answer { font-size: 15px; line-height: 1.6; background: var(--accent-soft); border-radius: 10px; padding: 12px 14px; }
+.err { color: var(--bad); font-weight: 500; }
+.pill { display: inline-block; font: 600 11px var(--body); padding: 2px 8px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line); }
+.pill.ok { color: var(--good); } .pill.bad { color: var(--bad); } .pill.wait { color: var(--warn); }
+.cmp { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.cmp > div { min-width: 0; }
+.cmp ol { margin: 0; padding-left: 18px; font: 11.5px var(--mono); }
+.cmp li { margin: 3px 0; overflow-wrap: anywhere; }
+.cmp li.same { color: var(--good); font-weight: 600; }
+.lower { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 16px; }
+@media (max-width: 1000px) { .lower { grid-template-columns: minmax(0, 1fr); } }
+.lower .card { padding: 14px 16px; }
+table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+th { font: 600 11px var(--body); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+td.n { font-family: var(--mono); font-size: 12.5px; }
+/* svg */
+svg text { fill: var(--fg); font-family: var(--body); }
+svg .lbl { font: 700 13px var(--display); }
+svg .tag { font: 11px var(--mono); fill: var(--muted); }
+svg .ms { font: 600 11px var(--mono); fill: var(--good); }
+svg .plate { fill: var(--surface-2); stroke: var(--line); stroke-width: 1; }
+svg .plate-txt { font: 700 12px var(--display); letter-spacing: .12em; fill: var(--muted); }
+svg .link { stroke: var(--edge); stroke-width: 2; fill: none; }
+svg .link.dash { stroke-dasharray: 5 5; }
+svg .link.lit { stroke: var(--packet); stroke-width: 3; }
+svg .face { stroke: rgba(0,0,0,.18); stroke-width: .8; transition: fill .45s ease; }
+svg .cube { cursor: pointer; transition: transform .25s ease; }
+svg .cube:hover, svg .cube.sel { transform: translateY(-6px); }
+svg .cube.sel .top { stroke: var(--fg); stroke-width: 1.6; }
+svg .cube.active .top { animation: pulse .8s ease-in-out infinite alternate; }
+svg .cube.dim { opacity: .45; }
+svg .shadow { fill: rgba(0,0,0,.13); }
+svg .packet { fill: var(--packet); filter: drop-shadow(0 0 4px var(--packet)); }
+svg .portlbl { font: 11px var(--mono); fill: var(--muted); }
+svg .cube .top { transition: fill .45s ease, transform .3s ease; }
+svg .cube.sel .top { transform: translateY(-7px); }
+.tabs { display: flex; flex-wrap: wrap; gap: 2px 2px; margin: 0 0 12px; border-bottom: 1px solid var(--line); }
+.tabs button { border: 0; background: none; font: 600 13px var(--body); color: var(--muted); padding: 6px 8px; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; }
+.tabs button[aria-pressed="true"] { color: var(--fg); border-bottom-color: var(--accent); }
+.stack { display: block; width: 100%; height: auto; margin: 4px 0 8px; }
+.stack g[data-part] { cursor: pointer; }
+.stack g[data-part]:focus-visible { outline: none; }
+.stack g[data-part]:focus-visible .snm { text-decoration: underline; }
+.stack .snm { font: 600 12px var(--mono); fill: var(--fg); }
+.stack .srl { font: 11px var(--body); fill: var(--muted); }
+.stack .sel .snm { fill: var(--accent); }
+.stack g[data-part] > g { transition: transform .25s ease; }
+.stack .sel > g { transform: translateX(14px); }
+pre.code { white-space: pre; overflow: auto; max-height: 420px; font-size: 11.5px; line-height: 1.5; }
+pre.code .ln { display: inline-block; width: 3.2em; color: var(--muted); user-select: none; }
+.origin { font: 600 11px var(--mono); padding: 1px 7px; border-radius: 999px; color: #fff; }
+.tip { position: fixed; z-index: 20; display: none; width: min(580px, calc(100vw - 24px)); pointer-events: none; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; box-shadow: 0 10px 28px rgba(0,0,0,.22); }
+.tip p { margin: 6px 0 0; color: var(--muted); font-size: 12px; }
+.jl { border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); padding: 4px; margin: 6px 0; }
+.jrow { display: flex; gap: 8px; align-items: baseline; padding: 2px 6px; border-radius: 5px; cursor: pointer; font: 11.5px/1.6 var(--mono); }
+.jrow code { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 11.5px; }
+.jrow .ln { color: var(--muted); min-width: 3.6em; text-align: right; user-select: none; }
+.jrow:hover { background: var(--surface); }
+.jrow.open { background: var(--accent-soft); }
+.jopen { padding: 2px 4px 10px 10px; border-left: 2px solid var(--accent); margin: 2px 0 8px 8px; }
+.jk { color: var(--accent); } .js { color: var(--good); } .jn { color: var(--warn); }
+.jfilter { display: flex; gap: 6px; margin: 10px 0 6px; }
+.jfilter input { flex: 1; min-width: 0; font: 12px var(--mono); padding: 6px 9px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface-2); color: var(--fg); }
+.jpager { display: flex; gap: 8px; align-items: center; justify-content: space-between; font-size: 12px; color: var(--muted); }
+.hscroll { overflow-x: auto; }
+.heat { font: 11.5px var(--mono); }
+.heat td, .heat th { padding: 4px 6px; text-align: center; border-bottom: 1px solid var(--line); }
+.heat th { text-transform: none; letter-spacing: 0; font: 600 11px var(--mono); }
+.heat td.f { text-align: left; max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.heat tr[data-mrow] { cursor: pointer; }
+.heat tr[data-mrow]:hover td { background-color: var(--surface-2); }
+.wbar { display: inline-block; height: 8px; border-radius: 2px; background: var(--accent); vertical-align: middle; }
+.wtab td { padding: 3px 6px; font: 11.5px var(--mono); white-space: nowrap; }
+.wtab td.t { color: var(--fg); font-weight: 500; }
+.calc { font: 11.5px/1.7 var(--mono); background: var(--accent-soft); border-radius: 8px; padding: 8px 10px; overflow-x: auto; white-space: nowrap; }
+.anim { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin: 10px 0 14px; background: var(--surface-2); }
+.actl { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 8px; }
+.actl .btn { padding: 4px 10px; font-size: 12px; }
+.actl input[type=range] { flex: 1; min-width: 90px; accent-color: var(--accent); }
+.actl select { font: 12px var(--body); background: var(--surface); color: var(--fg); border: 1px solid var(--line); border-radius: 6px; padding: 3px 4px; }
+.aphase { display: flex; gap: 4px; margin: 4px 0 8px; }
+.aphase span { flex: 1; text-align: center; font: 600 10.5px var(--body); letter-spacing: .04em; text-transform: uppercase; padding: 4px 2px; border-radius: 6px; background: var(--surface); color: var(--muted); border: 1px solid var(--line); }
+.aphase span.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+.aphase span.done { color: var(--accent); border-color: var(--accent); }
+.anote { font-size: 12.5px; margin: 4px 0 8px; min-height: 2.6em; }
+.words { font: 12px/1.9 var(--mono); max-height: 92px; overflow: hidden; display: flex; flex-wrap: wrap; gap: 2px 4px; align-content: flex-end; }
+.words .w { color: var(--muted); padding: 0 3px; border-radius: 4px; }
+.words .w.hit { color: var(--fg); }
+.words .w.now { background: var(--packet); color: #000; }
+.flow { font: 12px var(--mono); margin: 6px 0; min-height: 22px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.tk { display: inline-block; padding: 1px 7px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent); animation: pop .25s ease-out; }
+.tk.drop { background: transparent; color: var(--muted); border-color: var(--line); text-decoration: line-through; }
+@keyframes pop { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.atab { width: 100%; border-collapse: collapse; font: 11.5px var(--mono); }
+.atab td, .atab th { padding: 3px 6px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.atab th { font: 600 10.5px var(--body); color: var(--muted); }
+.atab td:first-child, .atab th:first-child { text-align: left; }
+.atab td.unk { color: var(--line); }
+.atab tr.now td { background: color-mix(in srgb, var(--packet) 30%, transparent); }
+.atab td.flash { animation: flash .5s ease-out; }
+@keyframes flash { from { background: var(--packet); color: #000; } to { background: transparent; } }
+.vchips { display: flex; flex-wrap: wrap; gap: 6px; }
+.vchips .btn { font: 12px var(--mono); padding: 4px 9px; }
+.vchips small { color: var(--muted); font: 10.5px var(--body); margin-left: 4px; }
+.fcard { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin: 10px 0; background: var(--surface-2); }
+.fcard p { margin: 4px 0; font-size: 12.5px; }
+.fcard pre { max-height: 180px; overflow: auto; font-size: 11.5px; }
+.fhead { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.fhead code { font-weight: 600; color: var(--fg); }
+.fsize { font: 12px var(--mono); color: var(--muted); margin-left: auto; }
+.ftag { font: 600 10px var(--body); letter-spacing: .05em; text-transform: uppercase; padding: 2px 7px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
+.ftag.b { background: color-mix(in srgb, var(--warn) 18%, transparent); color: var(--warn); }
+p.fnote { color: var(--muted); font-size: 12px; }
+.tourbtn { background: var(--packet); border-color: var(--packet); color: #1a1200; }
+.tourbtn[aria-pressed="true"] { background: transparent; color: var(--fg); }
+.tour { border-top: 1px solid var(--line); margin-top: 10px; padding: 14px 4px 4px; animation: pop .3s ease-out; }
+.tour h2 { margin: 2px 0 8px; }
+.tour .tbody { min-height: 150px; font-size: 13.5px; }
+.tour .tbody p { margin: 6px 0; max-width: 80ch; }
+.tour .kv { max-width: 640px; }
+.tour .atab { max-width: 380px; }
+.tbar { display: flex; gap: 5px; margin-bottom: 10px; }
+.tdot { flex: 1; height: 5px; border: 0; border-radius: 3px; background: var(--line); cursor: pointer; padding: 0; }
+.tdot.done { background: var(--accent); opacity: .5; }
+.tdot.on { background: var(--packet); }
+.tctl { display: flex; gap: 8px; align-items: center; margin-top: 12px; }
+.tctl .tx { margin-left: auto; }
+.tq { font: 600 15px var(--display); color: var(--fg); }
+.thits { display: grid; gap: 4px; font-size: 12.5px; }
+.thits > div { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.thits .tn { width: 18px; color: var(--muted); font: 600 11px var(--mono); }
+.thits small { color: var(--muted); font-family: var(--mono); }
+.tans { max-height: 170px; overflow: auto; }
+.tload::after { content: "…"; animation: blink 1s steps(3) infinite; }
+@keyframes blink { 50% { opacity: .2; } }
+.rowstrip { width: 100%; height: 34px; display: block; margin-top: 8px; }
+/* ---------- MCP session ---------- */
+.mcpcard { padding: 14px 16px; margin: 16px 0; }
+.mcphead { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; justify-content: space-between; }
+.mcphead p { color: var(--muted); margin: 4px 0 0; max-width: 92ch; }
+.mcphead code, .mcpcard code { font: 12px var(--mono); background: var(--surface-2); border: 1px solid var(--line); border-radius: 5px; padding: 0 4px; }
+.mcpflow { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 10px 0 2px; font-size: 12px; color: var(--muted); }
+.mcpflow span { background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; }
+.mcpflow b { color: var(--fg); font-weight: 600; }
+.mcpgrid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 14px; margin-top: 12px; }
+@media (max-width: 1000px) { .mcpgrid { grid-template-columns: minmax(0, 1fr); } }
+.seq { overflow-x: auto; }
+.seqin { min-width: 560px; display: grid; grid-template-columns: 150px minmax(0, 1fr) 150px; }
+.seqhd { font: 600 12px var(--body); padding: 8px; text-align: center; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); }
+.seqhd small { display: block; font: 11px var(--mono); color: var(--muted); font-weight: 400; overflow-wrap: anywhere; }
+.seqhd.wire { border: 0; background: none; color: var(--muted); font-weight: 500; align-self: end; }
+.lane { position: relative; min-height: 46px; display: flex; align-items: center; justify-content: center; padding: 3px 6px; }
+.lane::before { content: ""; position: absolute; top: 0; bottom: 0; left: 50%; border-left: 2px dashed var(--line); }
+.lane .act { position: relative; font: 11px var(--body); color: var(--fg); background: var(--accent-soft); border: 1px solid var(--line); border-radius: 6px; padding: 2px 6px; text-align: center; max-width: 100%; }
+.lane .act.bad { background: color-mix(in srgb, var(--bad) 16%, var(--surface)); }
+.msg { position: relative; min-height: 46px; padding: 2px 10px; cursor: pointer; border-radius: 6px; display: flex; flex-direction: column; justify-content: center; }
+.msg:hover, .msg.sel { background: var(--accent-soft); }
+.msg:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.msg .lbl { font: 12px var(--mono); overflow-wrap: anywhere; line-height: 1.35; }
+.msg .lbl b { font-weight: 600; }
+.msg .sub { font-size: 11px; color: var(--muted); display: flex; justify-content: space-between; gap: 8px; }
+.msg .arrow { height: 0; border-top: 2px solid var(--accent); margin: 4px 0 3px; position: relative; transform-origin: left; animation: grow .45s ease-out; }
+.msg.in .arrow { border-top-color: var(--good); transform-origin: right; }
+.msg.err .arrow { border-top-color: var(--bad); }
+.msg.note .arrow { border-top-style: dashed; }
+.msg .arrow::after { content: ""; position: absolute; top: -6px; right: -2px; border: 5px solid transparent; border-left: 8px solid var(--accent); }
+.msg.in .arrow::after { right: auto; left: -2px; border-left: 0; border-right: 8px solid var(--good); }
+.msg.err .arrow::after { border-right-color: var(--bad); }
+.msg.err .lbl { color: var(--bad); }
+.seqend { grid-column: 1 / -1; text-align: center; font-size: 12px; color: var(--muted); padding: 8px; border-top: 1px solid var(--line); margin-top: 4px; }
+@media (max-width: 600px) { .seqin { min-width: 440px; grid-template-columns: 92px minmax(0, 1fr) 92px; } .lane .act { font-size: 10px; } }
+@keyframes grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.mcpdetail { min-width: 0; }
+.mcpdetail pre { max-height: 520px; font-size: 11.5px; }
+.mcpdetail .kicker { font: 600 11px var(--body); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.mcpempty { color: var(--muted); border: 1px dashed var(--line); border-radius: 8px; padding: 18px; }
+@media (prefers-reduced-motion: reduce) { .msg .arrow { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .tk, .atab td.flash { animation: none; } }
+@keyframes pulse { from { filter: brightness(1); } to { filter: brightness(1.35); } }
+@media (prefers-reduced-motion: reduce) { svg .cube, svg .face { transition: none; } svg .cube.active .top { animation: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="bar">
+    <div class="brand"><h1>RAG Blocks</h1><small>vLLM 0.10.1 · the project's live pipeline</small></div>
+    <div class="seg" role="group" aria-label="Retrieval backend">
+      <button type="button" data-b="native" aria-pressed="true">native</button>
+      <button type="button" data-b="langchain" aria-pressed="false">LangChain</button>
+      <button type="button" data-b="qdrant" aria-pressed="false">Qdrant</button>
+    </div>
+    <form class="q" id="qform">
+      <input id="query" type="text" autocomplete="off" value="How do I load a LoRA adapter at runtime?" aria-label="Question">
+      <select id="k" aria-label="k"><option>1</option><option>3</option><option selected>5</option><option>10</option></select>
+      <button class="btn" id="run" type="submit">Run</button>
+    </form>
+    <label class="chk"><input type="checkbox" id="gen" checked> Qwen3 answer</label>
+    <button class="btn tourbtn" id="tourBtn" type="button" aria-pressed="false">▶ Tour</button>
+  </div>
+  <div class="chips" id="examples"></div>
+
+  <div class="main">
+    <div class="card">
+      <div class="scene"><svg id="pipe" xmlns="http://www.w3.org/2000/svg" aria-label="RAG pipeline"></svg></div>
+      <div class="legend" id="legend"></div>
+      <section class="tour" id="tour" hidden aria-live="polite" aria-label="Guided tour"></section>
+    </div>
+    <div class="gutter" id="gutter" role="separator" aria-orientation="vertical" aria-label="Resize the side panel (drag, arrow keys, double-click to reset)" tabindex="0"></div>
+    <aside class="card panel" id="panel" aria-live="polite"></aside>
+  </div>
+
+  <section class="card mcpcard" id="mcpCard" aria-label="MCP session">
+    <div class="mcphead">
+      <div>
+        <h2>MCP: the same search, as a tool for an agent</h2>
+        <p>Nobody inside the project calls the MCP server: a <b>client</b> starts it. The client reads the launch command from its own config, starts <code>python -m src.extra.mcp_server</code> as a child process and writes JSON-RPC lines to its stdin; replies come back on stdout. Here the engine plays that client against the real server, and every line that crossed the pipe is replayed below.</p>
+      </div>
+      <button class="btn" id="mcpRun" type="button">▶ Record an MCP session</button>
+    </div>
+    <div class="mcpflow" aria-label="Who calls whom"><span><b>model</b> picks a tool</span>→<span><b>client</b></span>→<span>stdin · JSON-RPC</span>→<span><b>server</b> src/extra/mcp_server</span>→<span>RagTools → BM25 index</span>→<span>stdout · result</span>→<span><b>model</b> reads it, maybe searches again</span></div>
+    <div class="mcpgrid">
+      <div class="seq" id="mcpSeq"><div class="mcpempty">Uses the question and k from the bar above. The session is real: handshake, tools/list, search_vllm, read_source around the first hit, then a bad call to show how errors reach the model.</div></div>
+      <div class="mcpdetail" id="mcpDetail" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <div class="lower">
+    <div class="card">
+      <h2>Docker: the rag-net network</h2>
+      <p style="color:var(--muted);margin:4px 0 0">The browser only talks to nginx. rag-engine publishes no port and is reached by name inside the network.</p>
+      <div class="scene" style="padding:0"><svg id="dock" xmlns="http://www.w3.org/2000/svg" aria-label="Container diagram"></svg></div>
+    </div>
+    <div class="card">
+      <h2>Indexes: native, LangChain, Qdrant</h2>
+      <div id="stats" style="margin-top:8px;overflow-x:auto"><p style="color:var(--muted)">Loading…</p></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+"use strict";
+const SVGNS = "http://www.w3.org/2000/svg";
+const U = 62, E = 0.66 * U, H = 46;            // grid unit, cube half-width, cube height
+const iso = (gx, gy) => [(gx - gy) * U, (gx + gy) * U / 2];
+
+const PALETTE = {
+  data:      [214, 14], shared: [232, 52], native: [213, 62], langchain: [168, 62],
+  llm:       [36, 82],  infra:  [280, 36], volume: [200, 10], browser: [214, 14],
+  qdrant:    [352, 64], lib: [30, 16]
+};
+const faceColor = (type, face) => {
+  const [h, s] = PALETTE[type];
+  const l = { top: 70, left: 54, right: 41 }[face];
+  return `hsl(${h} ${s}% ${l}%)`;
+};
+
+const EXAMPLES = [
+  "How do I enable speculative decoding in vLLM?",
+  "How do I load a LoRA adapter at runtime?",
+  "What does --tensor-parallel-size do?",
+  "How is PagedAttention implemented?",
+  "Which scheduler does the V1 engine use?",
+  "How to enable prefix caching?"
+];
+
+const CUBES = [
+  { id: "corpus",   gx: 0,  gy: 0, type: "data",    title: "Corpus",      tag: () => "data/raw/vllm" },
+  { id: "chunker",  gx: 2,  gy: 0, type: "backend", title: "Chunker",     tag: b => (b === "langchain" ? "Recursive" : "AST") + " · ≤ " + chunkSize(b) + " chars" },
+  { id: "index",    gx: 4,  gy: 0, type: "backend", title: "Index",       tag: b => ({ native: "BM25 · scipy CSC", langchain: "BM25Retriever.pkl", qdrant: "Qdrant · cosine" })[b] },
+  { id: "query",    gx: 0,  gy: 5, type: "data",    title: "Question",    tag: () => "k = " + kSel.value },
+  { id: "tokenize", gx: 2,  gy: 5, type: "shared",  title: b => b === "qdrant" ? "Embedder" : "Tokenizer", tag: b => b === "qdrant" ? "MiniLM · 384-d" : "services/tokenizer" },
+  { id: "retrieve", gx: 4,  gy: 5, type: "backend", title: "Retriever",   tag: b => ({ native: "W[:, q].sum()", langchain: "rank_bm25", qdrant: "query_points" })[b] },
+  { id: "augment",  gx: 6,  gy: 5, type: "shared",  title: "Augment",     tag: () => "≤ 3000 tokens" },
+  { id: "llm",      gx: 8,  gy: 5, type: "llm",     title: "Qwen3-0.6B",  tag: () => "generate()" },
+  { id: "output",   gx: 10, gy: 5, type: "data",    title: "JSON",        tag: () => "MinimalAnswer" }
+];
+const LINKS = [
+  ["corpus", "chunker"], ["chunker", "index"], ["index", "retrieve", "dash"],
+  ["query", "tokenize"], ["tokenize", "retrieve"], ["retrieve", "augment"],
+  ["augment", "llm"], ["llm", "output"]
+];
+const PLATES = [
+  { x0: -0.85, x1: 4.85, y0: -0.9, y1: 1.45, text: "INDEXING · OFFLINE, make index" },
+  { x0: -0.85, x1: 10.85, y0: 4.1, y1: 6.45, text: "QUERY · ONLINE, search / answer" }
+];
+const TERM_COLORS = ["#2f6fd6", "#12957e", "#d08a16", "#b4459f", "#5d6bd8", "#c2413a", "#3d9a3d", "#7a5bd3"];
+
+const CHUNK_CUBES = new Set(["chunker", "index"]);   // cubes whose output is the stored chunk records
+const PAGE = 25;
+const freshChunks = () => ({ key: "", data: null, q: "", offset: 0, open: null, loading: false, error: null });
+const state = { tab: "inside", part: 0, inside: null, backend: "native", trace: null, gen: null, cmp: null, stats: null, health: null,
+  sel: "query", running: false, timings: {}, status: {}, error: null,
+  chunks: freshChunks(), mrow: null, mdata: null, mloading: false, merror: null,
+  vocab: { term: "", prefix: "", data: null, loading: false, error: null }, files: { data: null, loading: false, error: null } };
+
+const $ = s => document.querySelector(s);
+const kSel = $("#k"), qInput = $("#query"), runBtn = $("#run"), genChk = $("#gen");
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const fmt = n => n == null ? "–" : Number(n).toLocaleString("en-US");
+const fms = n => n == null ? "" : (n >= 1000 ? (n / 1000).toFixed(1) + " s" : (n < 10 ? n.toFixed(1) : Math.round(n)) + " ms");
+const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+function el(tag, attrs = {}, parent) {
+  const n = document.createElementNS(SVGNS, tag);
+  for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+  if (parent) parent.appendChild(n);
+  return n;
+}
+const pts = arr => arr.map(p => p.join(",")).join(" ");
+
+/* ---------- generic iso scene ---------- */
+function drawCube(parent, c, opts = {}) {
+  const [cx, cy] = iso(c.gx, c.gy);
+  const e = opts.e || E, h = opts.h || H, hh = e / 2;
+  const g = el("g", { class: "cube", tabindex: opts.static ? "-1" : "0", "data-id": c.id, role: opts.static ? "img" : "button", "aria-label": c.title }, parent);
+  el("polygon", { class: "shadow", points: pts([[cx, cy - hh + 6], [cx + e + 6, cy + 3], [cx, cy + hh + 6], [cx - e + 4, cy + 3]]) }, g);
+  const T = [cx, cy - h - hh], R = [cx + e, cy - h], B = [cx, cy - h + hh], L = [cx - e, cy - h];
+  const left = el("polygon", { class: "face left", points: pts([L, B, [B[0], B[1] + h], [L[0], L[1] + h]]) }, g);
+  const right = el("polygon", { class: "face right", points: pts([B, R, [R[0], R[1] + h], [B[0], B[1] + h]]) }, g);
+  const top = el("polygon", { class: "face top", points: pts([T, R, B, L]) }, g);
+  g._faces = { left, right, top };
+  return g;
+}
+function paintCube(g, type) {
+  for (const f of ["left", "right", "top"]) g._faces[f].style.fill = faceColor(type, f);
+}
+function drawPlate(parent, p) {
+  const a = iso(p.x0, p.y0), b = iso(p.x1, p.y0), c = iso(p.x1, p.y1), d = iso(p.x0, p.y1);
+  el("polygon", { class: "plate", points: pts([a, b, c, d]) }, parent);
+  const [tx, ty] = iso(p.x0 + 0.3, p.y1 - 0.12);
+  const t = el("text", { class: "plate-txt", x: tx, y: ty, transform: `rotate(26.565 ${tx} ${ty})` }, parent);
+  t.textContent = p.text;
+}
+function linkPath(a, b) {
+  const [x1, y1] = iso(a.gx, a.gy), [x2, y2] = iso(b.gx, b.gy);
+  return `M${x1},${y1} L${x2},${y2}`;
+}
+function fitViewBox(svg, pad = 28) {
+  const bb = svg.getBBox();
+  svg.setAttribute("viewBox", `${bb.x - pad} ${bb.y - pad} ${bb.width + pad * 2} ${bb.height + pad * 2}`);
+}
+
+/* ---------- pipeline scene ---------- */
+const pipe = $("#pipe");
+const byId = Object.fromEntries(CUBES.map(c => [c.id, c]));
+const cubeEls = {}, linkEls = {}, labelEls = {};
+let packet;
+
+function buildPipeline() {
+  const lPlates = el("g", {}, pipe), lLinks = el("g", {}, pipe), lCubes = el("g", {}, pipe), lLabels = el("g", {}, pipe);
+  PLATES.forEach(p => drawPlate(lPlates, p));
+  for (const [a, b, kind] of LINKS) {
+    linkEls[a + ">" + b] = el("path", { class: "link" + (kind ? " " + kind : ""), d: linkPath(byId[a], byId[b]) }, lLinks);
+  }
+  [...CUBES].sort((a, b) => (a.gx + a.gy) - (b.gx + b.gy)).forEach(c => {
+    const g = drawCube(lCubes, c);
+    cubeEls[c.id] = g;
+    const open = () => { hideTip(); select(c.id, CHUNK_CUBES.has(c.id) ? "chunks" : undefined); };
+    g.addEventListener("click", open);
+    g.addEventListener("keydown", ev => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); open(); } });
+    if (CHUNK_CUBES.has(c.id)) {
+      g.addEventListener("mouseenter", ev => showTip(c.id, ev));
+      g.addEventListener("mousemove", moveTip);
+      g.addEventListener("mouseleave", hideTip);
+    }
+  });
+  CUBES.forEach(c => {
+    const [cx, cy] = iso(c.gx, c.gy);
+    const y = cy - H - E / 2 - 26;
+    const g = el("g", { "pointer-events": "none" }, lLabels);
+    const t = el("text", { class: "lbl", x: cx, y, "text-anchor": "middle" }, g);
+    const tag = el("text", { class: "tag", x: cx, y: y + 15, "text-anchor": "middle" }, g);
+    const msT = el("text", { class: "ms", x: cx, y: cy + E / 2 + 22, "text-anchor": "middle" }, g);
+    labelEls[c.id] = { t, tag, msT };
+  });
+  fitViewBox(pipe);
+  packet = el("circle", { class: "packet", r: 6, cx: 0, cy: 0, visibility: "hidden" }, pipe);
+  paintAll();
+}
+function typeOf(c) {
+  if (c.type === "backend") return c.id === "chunker" && state.backend === "qdrant" ? "native" : state.backend;
+  if (c.id === "tokenize" && state.backend === "qdrant") return "qdrant";
+  return c.type;
+}
+const titleOf = c => typeof c.title === "function" ? c.title(state.backend) : c.title;
+function paintAll() {
+  CUBES.forEach(c => {
+    paintCube(cubeEls[c.id], typeOf(c));
+    const L = labelEls[c.id];
+    L.t.textContent = titleOf(c);
+    L.tag.textContent = c.tag(state.backend);
+    const st = state.status[c.id];
+    L.msT.textContent = st === "skip" ? "skipped" : (state.timings[c.id] != null ? fms(state.timings[c.id]) : "");
+    L.msT.style.fill = st === "skip" ? "var(--muted)" : "";
+    cubeEls[c.id].classList.toggle("active", st === "active");
+    cubeEls[c.id].classList.toggle("sel", state.sel === c.id);
+    cubeEls[c.id].classList.toggle("dim", st === "skip");
+  });
+}
+
+function travel(a, b, ms = 520) {
+  const path = linkEls[a + ">" + b];
+  if (!path) return Promise.resolve();
+  path.classList.add("lit");
+  if (reduced) return Promise.resolve();
+  const len = path.getTotalLength();
+  return new Promise(res => {
+    const t0 = performance.now();
+    const step = now => {
+      const k = Math.min(1, (now - t0) / ms);
+      const p = path.getPointAtLength(len * (k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2));
+      packet.setAttribute("cx", p.x); packet.setAttribute("cy", p.y); packet.setAttribute("visibility", "visible");
+      if (k < 1) requestAnimationFrame(step); else { packet.setAttribute("visibility", "hidden"); res(); }
+    };
+    requestAnimationFrame(step);
+  });
+}
+const wait = ms => new Promise(r => setTimeout(r, reduced ? 0 : ms));
+function setStatus(id, st, ms) { state.status[id] = st; if (ms != null) state.timings[id] = ms; paintAll(); }
+
+/* ---------- API ---------- */
+async function api(path, body) {
+  const r = await fetch("/api" + path, body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {});
+  let data;
+  try { data = await r.json(); } catch { throw new Error(`HTTP ${r.status}: rag-engine is not responding`); }
+  if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+  return data;
+}
+
+/* ---------- run ---------- */
+async function run() {
+  if (state.running) return;
+  if (typeof tourStop === "function" && tour.on) tourStop();
+  const query = qInput.value.trim();
+  if (!query) { state.error = "Type a question."; select("query"); return; }
+  state.running = true; runBtn.disabled = true; runBtn.textContent = "Running…";
+  state.trace = null; state.gen = null; state.cmp = null; state.error = null;
+  state.status = {}; state.timings = {};
+  Object.values(linkEls).forEach(p => p.classList.remove("lit"));
+  const k = Number(kSel.value), backend = state.backend, wantGen = genChk.checked;
+  try {
+    select("query", "data"); setStatus("query", "active");
+    const tp = api("/trace", { query, k, backend });
+    await travel("query", "tokenize");
+    const tr = await tp;
+    state.trace = tr;
+    setStatus("query", "done", 0);
+    setStatus("tokenize", "active"); await wait(250);
+    setStatus("tokenize", "done", tr.tokenize.ms); select("tokenize");
+    await Promise.all([travel("tokenize", "retrieve"), travel("index", "retrieve")]);
+    setStatus("index", "done"); setStatus("retrieve", "active"); await wait(300);
+    setStatus("retrieve", "done", tr.retrieve.score_ms); select("retrieve");
+    await travel("retrieve", "augment");
+    setStatus("augment", "done", tr.augment.ms); select("augment");
+    if (tr.augment.error) throw new Error(tr.augment.error);
+    if (wantGen && tr.sources.length) {
+      await travel("augment", "llm");
+      setStatus("llm", "active"); select("llm");
+      const g = await api("/generate", { query, sources: tr.sources });
+      state.gen = g;
+      setStatus("llm", "done", g.ms);
+      await travel("llm", "output");
+    } else {
+      setStatus("llm", "skip");
+    }
+    setStatus("output", "done");
+    select(state.gen ? "llm" : "retrieve");
+  } catch (e) {
+    state.error = e.message;
+    for (const id in state.status) if (state.status[id] === "active") state.status[id] = "error";
+    paintAll(); renderPanel();
+  } finally {
+    state.running = false; runBtn.disabled = false; runBtn.textContent = "Run";
+    refreshHealth();
+  }
+}
+
+/* ---------- panel ---------- */
+function select(id, tab) {
+  if (id !== state.sel) state.part = 0;
+  if (tab) state.tab = tab;
+  state.sel = id; paintAll(); renderPanel();
+}
+const panel = $("#panel");
+const head = (kicker, title, body) => `<div class="kicker">${kicker}</div><h2>${title}</h2>${body ? `<p>${body}</p>` : ""}`;
+const NAMES = { native: "native", langchain: "LangChain", qdrant: "Qdrant" };
+const bk = () => NAMES[state.backend];
+const curStats = () => state.stats && state.stats[state.backend];
+// --max_chunk_size the index was built with (meta.json); "?" if not recorded
+function chunkSize(b) {
+  const s = state.stats && state.stats[b];
+  return s && s.max_chunk_size ? s.max_chunk_size : "?";
+}
+const chunkSizeText = s => s && s.max_chunk_size
+  ? `<code>--max_chunk_size ${s.max_chunk_size}</code>`
+  : "not recorded in meta.json (index built by an older version: re-run <code>index</code>)";
+
+function kv(rows) { return `<dl class="kv">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("")}</dl>`; }
+
+function hitsHtml(hits, terms) {
+  if (!hits.length) return `<p>No chunk contains any word of the question.</p>`;
+  const color = {}; (terms || []).forEach((t, i) => color[t.term] = TERM_COLORS[i % TERM_COLORS.length]);
+  const max = Math.max(...hits.map(h => h.score), 1e-9);
+  return hits.map((h, i) => {
+    if (!Object.keys(h.terms).length) {
+      const col = faceColor("qdrant", "right");
+      return `<div class="hit"><header><span class="rank">#${i + 1}</span><span class="path">${esc(h.file_path.replace("data/raw/vllm-0.10.1/", ""))}</span><span class="score">cos ${h.score.toFixed(3)}</span></header>
+        <div class="sbar"><span style="width:${Math.max(0, h.score * 100).toFixed(1)}%;background:${col}"></span></div>
+        <div class="terms"><span>cosine similarity, 1.0 = same direction</span></div>
+        <div class="terms" style="margin-top:4px"><span>chars ${fmt(h.first_character_index)}–${fmt(h.last_character_index)} (${fmt(h.chars)})</span><span>${esc(h.kind)}</span>${h.context ? `<span>${esc(h.context.slice(0, 60))}</span>` : ""}</div>
+        <details><summary>chunk text</summary><pre>${esc(h.preview)}${h.truncated ? "\n…" : ""}</pre></details></div>`;
+    }
+    const segs = Object.entries(h.terms).map(([t, v]) => `<span title="${esc(t)}: ${v}" style="width:${(v / max * 100).toFixed(2)}%;background:${color[t] || "#888"}"></span>`).join("");
+    const legend = Object.entries(h.terms).map(([t, v]) => `<span><b style="background:${color[t] || "#888"}"></b>${esc(t)} ${v.toFixed(2)}</span>`).join("");
+    return `<div class="hit"><header><span class="rank">#${i + 1}</span><span class="path">${esc(h.file_path.replace("data/raw/vllm-0.10.1/", ""))}</span><span class="score">${h.score.toFixed(2)}</span></header>
+      <div class="sbar">${segs}</div><div class="terms">${legend}</div>
+      <div class="terms" style="margin-top:4px"><span>chars ${fmt(h.first_character_index)}–${fmt(h.last_character_index)} (${fmt(h.chars)})</span><span>${esc(h.kind)}</span>${h.context ? `<span>${esc(h.context.slice(0, 60))}</span>` : ""}</div>
+      <details><summary>chunk text</summary><pre>${esc(h.preview)}${h.truncated ? "\n…" : ""}</pre></details></div>`;
+  }).join("");
+}
+
+function compareHtml() {
+  if (!state.cmp) return Object.keys(NAMES).filter(b => b !== state.trace.backend)
+    .map(b => `<button class="btn ghost" data-cmp="${b}" type="button">Compare with ${NAMES[b]}</button>`).join(" ");
+  if (state.cmp.error) return `<p class="err">${esc(state.cmp.error)}</p>`;
+  const key = s => `${s.file_path}:${s.first_character_index}`;
+  const files = list => new Set(list.map(s => s.file_path));
+  const a = state.trace.sources, b = state.cmp.sources, fa = files(a), fb = files(b);
+  const li = (s, other) => `<li class="${other.has(s.file_path) ? "same" : ""}">${esc(s.file_path.replace("data/raw/vllm-0.10.1/", ""))} <span style="color:var(--muted)">@${s.first_character_index}</span></li>`;
+  return `<div class="cmp"><div><h3>${NAMES[state.trace.backend]}</h3><ol>${a.map(s => li(s, fb)).join("")}</ol></div>
+    <div><h3>${NAMES[state.cmp.backend]}</h3><ol>${b.map(s => li(s, fa)).join("")}</ol></div></div>
+    <p>Green marks files found by both backends. Their chunk boundaries differ, so the comparison is per file.</p>`;
+}
+
+const RENDER = {
+  corpus() {
+    const s = curStats();
+    return head("Step 0 · input", "vLLM 0.10.1 corpus",
+      "discover_files() walks data/raw/ and keeps .py, .md, .rst and .txt files. It skips .git, .github, __pycache__ and node_modules. Both backends share this walk.") +
+      kv([["Files with chunks", fmt(s && s.files)], ["Path in the output", "<code>data/raw/vllm-0.10.1/…</code>"], ["Requirement", "file_path must match byte for byte"]]);
+  },
+  chunker() {
+    const s = curStats();
+    const n = state.stats && state.stats.native, l = state.stats && state.stats.langchain;
+    const txt = state.backend !== "langchain"
+      ? (state.backend === "qdrant" ? "Qdrant reuses the native chunker, so the backends differ only in retrieval. " : "") + "Python is split with the AST: a whole function or class per chunk. Small neighbours are merged and large ones are cut on line boundaries. Markdown is split by headings. Each chunk stores a context (enclosing class or headings) that is indexed with its text."
+      : "RecursiveCharacterTextSplitter.from_language(PYTHON | MARKDOWN), chunk_overlap = 0, add_start_index = True. The splitter tries separators in order: class, def, blank line, newline, space. split_spans() computes the end as start + len and re-cuts anything over the limit.";
+    return head("Step 1 · " + bk(), "Chunking", txt) +
+      kv([["Chunk size", chunkSizeText(s)], ["Chunks", fmt(s && s.chunks)], ["Average size", fmt(s && s.avg_chars) + " chars"], ["Largest chunk", fmt(s && s.max_chars) + " chars (grader limit 2000)"]]) +
+      (n && l ? `<h3>Comparison</h3><table><tr><th></th><th>native</th><th>LangChain</th></tr>
+        <tr><td>max_chunk_size</td><td class="n">${n.max_chunk_size || "?"}</td><td class="n">${l.max_chunk_size || "?"}</td></tr>
+        <tr><td>chunks</td><td class="n">${fmt(n.chunks)}</td><td class="n">${fmt(l.chunks)}</td></tr>
+        <tr><td>average</td><td class="n">${fmt(n.avg_chars)}</td><td class="n">${fmt(l.avg_chars)}</td></tr></table>` : "") +
+      (state.backend !== "langchain" && n && n.kinds ? `<h3>Chunk kinds</h3>${kv(Object.entries(n.kinds).map(([k, v]) => [k, fmt(v)]))}` : "");
+  },
+  index() {
+    const s = curStats();
+    if (state.backend === "qdrant") {
+      return head("Step 2 · Qdrant", "Vector database",
+        "Every chunk is embedded once with all-MiniLM-L6-v2 into a 384-number unit vector and stored as a Qdrant point. The payload holds file_path and the character span, so a hit maps straight to a MinimalSource. Qdrant runs embedded (local mode, no server): the collection lives in data/processed/qdrant/storage.") +
+        (s && s.error ? `<p class="err">${esc(s.error)}</p>` :
+        kv([["Points", fmt(s && s.chunks)], ["Vector", s ? `${s.dim} floats, ${esc(s.distance)} distance` : "–"], ["Model", `<code>${esc(s && s.model)}</code>`], ["Storage", esc(s && s.storage)], ["Open in this server", s && s.load_ms ? fms(s.load_ms) : "not yet (opens on first Qdrant query)"]])) +
+        `<p>Embedded mode searches exactly: the query vector is compared with every stored vector in numpy. A Qdrant server would build an HNSW graph for approximate search, which pays off from about 100k vectors.</p>`;
+    }
+    const txt = state.backend === "native"
+      ? "The weight matrix W (chunks × terms) is computed once at indexing time: W[d,t] = idf(t) · tf·(k1+1) / (tf + k1·(1 − b + b·|d|/avgdl)). On disk: chunks.jsonl, bm25_weights.npz and bm25_vocab.json."
+      : "BM25Retriever.from_documents(docs, preprocess_func=tokenize) keeps each Document with metadata = {file_path, first, last}, plus a BM25Okapi from rank_bm25 inside. The whole object is saved as one pickle.";
+    return head("Step 2 · " + bk(), "BM25 index", txt) +
+      kv([["Vocabulary", fmt(s && s.vocab) + " terms"], ["k1 / b", s ? `${s.k1} / ${s.b}` : "–"], ["Load into memory", fms(s && s.load_ms) || "–"]]);
+  },
+  query() {
+    return head("Online · input", "Question",
+      "The CLI commands <code>search</code> and <code>answer</code> follow this same path. <code>search_dataset</code> does it for every question of a dataset.") +
+      kv([["Question", esc(qInput.value)], ["k", kSel.value], ["Backend", bk()], ["Total retrieval time", state.trace ? fms(state.trace.total_ms) : "–"]]) +
+      (state.error ? `<p class="err">${esc(state.error)}</p>` : "") +
+      `<h3>CLI equivalent</h3><pre>uv run python -m src --backend ${state.backend} \\\n  answer "${esc(qInput.value)}" --k ${kSel.value}</pre>`;
+  },
+  tokenize() {
+    const t = state.trace;
+    if (state.backend === "qdrant") {
+      const base = head("Step 3 · Qdrant", "Embedder: question → vector",
+        "No BM25 tokens here. The MiniLM tokenizer cuts the question into word pieces, the model turns them into one 384-number vector (mean of the token vectors, L2-normalized), and Qdrant compares that vector with every chunk vector. Chunks were embedded with the same model at indexing time.");
+      const e = t && t.tokenize.embed;
+      if (!e) return base + `<p>Run a question to see its vector.</p>`;
+      const max = Math.max(...e.head.map(Math.abs), 1e-9);
+      const bars = e.head.map(v => `<span title="${v}" style="height:${(Math.abs(v) / max * 100).toFixed(1)}%;background:${faceColor(v >= 0 ? "qdrant" : "shared", "right")};align-self:${v >= 0 ? "flex-end" : "flex-start"}"></span>`).join("");
+      return base + `<h3>Word pieces (MiniLM tokenizer)</h3><div>${e.pieces.map(w => `<span class="tok">${esc(w)}</span>`).join("")}</div>
+        <div class="arrow">↓ transformer · mean pooling · L2 normalize</div>
+        <h3>Query vector: first ${e.head.length} of ${e.dim} numbers</h3><div class="vec">${bars}</div>
+        ${kv([["Dimensions", e.dim], ["Length (L2 norm)", e.norm], ["Encoding time", fms(e.ms)]])}
+        <p>Red bars are positive values, blue ones negative. The length is 1, so the dot product with a chunk vector is the cosine.</p>`;
+    }
+    const base = head("Step 3 · shared", "Tokenizer",
+      "tokenize() is the same at indexing and query time and for both BM25 backends. It splits camelCase and snake_case, lowercases, drops stopwords and strips suffixes. That is why the question “LoRA adapter” matches both <code>lora_adapter</code> and <code>LoRAAdapter</code>.");
+    if (!t) return base + `<p>Run a question to see its tokens.</p>`;
+    const info = Object.fromEntries(t.retrieve.terms.map(x => [x.term, x]));
+    return base + `<h3>Question words</h3><div>${t.tokenize.words.map(w => `<span class="tok">${esc(w)}</span>`).join("")}</div>
+      <div class="arrow">↓ split · lower · stopwords · stem</div>
+      <h3>Tokens → document frequency</h3><div>${t.tokenize.tokens.map(w => { const i = info[w]; return `<span class="tok ${i && !i.in_vocab ? "miss" : ""}">${esc(w)}<small>${i ? fmt(i.df) : ""}</small></span>`; }).join("")}</div>
+      <p>The number next to a token is how many chunks contain it. The smaller it is, the higher the idf and the more the token weighs in the ranking. Struck-out tokens are not in the index vocabulary.</p>`;
+  },
+  retrieve() {
+    const t = state.trace;
+    const base = head("Step 4 · " + bk(), "Retriever: top-k", t ? `<code>${esc(t.retrieve.how)}</code>` : (state.backend === "qdrant" ? "Cosine between the query vector and every chunk vector, then the k nearest." : "BM25 scores every chunk, then keeps the k best."));
+    if (!t) return base + `<p>Run a question.</p>`;
+    const isVec = t.backend === "qdrant";
+    return base + kv(isVec ? [["Vectors compared", fmt(t.retrieve.scored)], ["Search", fms(t.retrieve.score_ms)]]
+        : [["Chunks scored", fmt(t.retrieve.scored)], ["With score > 0", fmt(t.retrieve.matched)], ["Scoring", fms(t.retrieve.score_ms)]]) +
+      (isVec ? `<p>A vector search always returns k results, even for a nonsense question: there is no “no match”, only “least far”.</p>` : "") +
+      `<h3>${isVec ? "Nearest chunks" : "Results and each term's contribution"}</h3>${hitsHtml(t.retrieve.hits, t.retrieve.terms)}<h3>Backend comparison</h3>${compareHtml()}`;
+  },
+  augment() {
+    const a = state.trace && state.trace.augment;
+    const base = head("Step 5 · shared", "Augment: context for the model",
+      "build_context() adds chunks in rank order while they fit in 3000 Qwen tokens. Each block is “[n] path” followed by the text. The system prompt, the context and the question then go into the chat template.");
+    if (!a) return base + `<p>Run a question.</p>`;
+    if (a.error) return base + `<p class="err">${esc(a.error)}</p>`;
+    const bar = a.blocks.map((b, i) => `<span class="${b.kept ? "" : "drop"}" style="flex:0 0 ${(b.tokens / a.budget * 100).toFixed(2)}%;background:${TERM_COLORS[i % TERM_COLORS.length]}" title="[${b.n}] ${esc(b.file_path)}: ${b.tokens} tok.">[${b.n}]</span>`).join("");
+    return base + kv([["Used", `${fmt(a.used)} / ${fmt(a.budget)} tokens`], ["Full prompt", fmt(a.prompt_tokens) + " tokens"], ["Blocks in context", `${a.blocks.filter(b => b.kept).length} of ${a.blocks.length}`]]) +
+      `<h3>Budget</h3><div class="budget">${bar}</div><p>A hatched block did not fit in the budget and never reaches the model.</p>
+      <h3>System prompt</h3><pre>${esc(a.system_prompt)}</pre>
+      <details><summary>Full prompt (Qwen3 chat template)</summary><pre>${esc(a.prompt)}</pre></details>`;
+  },
+  llm() {
+    const g = state.gen;
+    const base = head("Step 6 · generation", "Qwen/Qwen3-0.6B",
+      "AnswerGenerator.answer(): greedy decoding (do_sample = False), repetition_penalty 1.1, at most 256 new tokens, thinking mode off. In Docker the model runs on CPU, and the first run also loads the weights.");
+    if (state.status.llm === "active" && !g) return base + `<p><span class="pill wait">generating…</span> On CPU this usually takes 5–30 seconds.</p>`;
+    if (state.status.llm === "skip") return base + `<p>Generation is off (the “Qwen3 answer” checkbox) or nothing was retrieved.</p>`;
+    if (!g) return base + (state.error ? `<p class="err">${esc(state.error)}</p>` : `<p>Run a question with “Qwen3 answer” checked.</p>`);
+    return base + `<h3>Answer</h3><div class="answer">${esc(g.answer)}</div>` +
+      kv([["Generation", fms(g.ms)], ["Model load", g.load_ms > 50 ? fms(g.load_ms) : "already in memory"], ["Device", g.device]]);
+  },
+  output() {
+    const t = state.trace;
+    const base = head("Step 7 · output", "JSON from the pydantic models",
+      "A single question returns a MinimalAnswer (or MinimalSearchResults without an answer). A dataset is saved as StudentSearchResults / StudentSearchResultsAndAnswer, and that file is what the moulinette grades.");
+    if (!t) return base + `<p>Run a question.</p>`;
+    const out = state.gen ? state.gen.output : { question_id: "query", question: t.query, retrieved_sources: t.sources };
+    return base + `<pre>${esc(JSON.stringify(out, null, 2))}</pre>`;
+  }
+};
+
+function insideParts(id) {
+  const key = id === "tokenize" && state.backend === "qdrant" ? "embed" : id;
+  const v = state.inside && state.inside[key];
+  return v ? (v.all || v[state.backend] || []) : null;
+}
+function stackSvg(parts, type, cur) {
+  const ROW = 44, cx = 52, hw = 38, hh = 19, th = 12;
+  const rows = parts.map((p, i) => {
+    const y = 26 + i * ROW, kind = p.origin === "project" ? type : "lib";
+    const T = [cx, y - hh], R = [cx + hw, y], B = [cx, y + hh], L = [cx - hw, y];
+    const poly = (ps, f) => `<polygon points="${ps.map(q => q.join(",")).join(" ")}" style="fill:${faceColor(kind, f)}" stroke="rgba(0,0,0,.2)" stroke-width=".8"/>`;
+    return `<g data-part="${i}" tabindex="0" role="button" aria-label="${esc(p.name)}" class="${i === cur ? "sel" : ""}"><g>
+      ${poly([L, B, [B[0], B[1] + th], [L[0], L[1] + th]], "left")}${poly([B, R, [R[0], R[1] + th], [B[0], B[1] + th]], "right")}${poly([T, R, B, L], "top")}
+      <text x="${cx}" y="${y + 4}" text-anchor="middle" style="font:700 11px var(--display);fill:rgba(0,0,0,.6)">${i + 1}</text></g>
+      <text class="snm" x="${cx + hw + 26}" y="${y - 2}">${esc(p.name)}</text>
+      <text class="srl" x="${cx + hw + 26}" y="${y + 13}">${esc(p.role)}</text></g>`;
+  }).join("");
+  const h = 26 + parts.length * ROW;
+  return `<svg class="stack" viewBox="0 0 420 ${h}" xmlns="${SVGNS}">${rows}</svg>`;
+}
+function insideHtml() {
+  const id = state.sel, c = byId[id];
+  const parts = insideParts(id);
+  const top = `<div class="kicker">Inside · ${insideParts(id) && state.inside[id] && !state.inside[id].all ? bk() : "shared"}</div><h2>${esc(titleOf(c))}: what it is made of</h2>`;
+  if (!parts) return top + `<p>${state.inside === null ? "Loading the project's source…" : "Cannot reach rag-engine."}</p>`;
+  const i = Math.min(state.part, parts.length - 1), p = parts[i];
+  const libs = [...new Set(parts.filter(x => x.origin !== "project").map(x => x.origin))];
+  const lead = `${parts.length} parts, in the order a request goes through them. Code is read live from the project with <code>inspect</code>.` +
+    (libs.length ? ` Grey-brown layers are library code (${libs.map(esc).join(", ")}), not the project's.` : "");
+  const color = faceColor(p.origin === "project" ? typeOf(c) : "lib", "right");
+  const detail = p.error ? `<p class="err">${esc(p.error)}</p>` : `
+    <h3>${i + 1} · <span style="text-transform:none;letter-spacing:0;color:var(--fg)">${esc(p.name)}</span></h3>
+    <p><span class="origin" style="background:${color}">${esc(p.origin)}</span> <code>${esc(p.file)}:${p.line}</code> · ${p.lines} lines</p>
+    ${p.doc ? `<p>${esc(p.doc)}</p>` : ""}
+    <pre class="code">${p.source.split("\n").map((l, j) => `<span class="ln">${p.line + j}</span>${esc(l)}`).join("\n")}</pre>`;
+  return top + `<p>${lead}</p>${stackSvg(parts, typeOf(c), i)}${detail}`;
+}
+/* ---------- stored chunks + BM25 matrix ---------- */
+// colour a JSON string: keys, string values, numbers
+const jsonHl = s => esc(s).replace(/(&quot;(?:[^&]|&(?!quot;))*?&quot;)(\s*:)?|(-?\b\d+(?:\.\d+)?\b)/g,
+  (m, str, colon, num) => str ? `<span class="${colon ? "jk" : "js"}">${str}</span>${colon || ""}` : `<span class="jn">${num}</span>`);
+const jsonRow = it => `<span class="ln">${it.n}</span><code>${jsonHl(it.line)}</code>`;
+
+async function loadChunks() {
+  const c = state.chunks, b = state.backend;
+  c.loading = true;
+  try {
+    c.data = await api(`/chunks?backend=${b}&offset=${c.offset}&limit=${PAGE}&q=${encodeURIComponent(c.q)}`);
+    c.error = null;
+  } catch (e) { c.error = e.message; c.data = null; }
+  c.loading = false; c.key = b;
+  if (state.tab === "chunks") renderPanel();
+}
+function chunksHtml() {
+  const c = state.chunks, d = c.data;
+  const top = head("Storage · " + bk(), "Chunks as stored on disk", "");
+  if (c.error && c.key === state.backend) return top + `<p class="err">${esc(c.error)}</p>`;
+  if (!d || c.key !== state.backend) {
+    if (!c.loading) setTimeout(loadChunks);
+    return top + `<p>Loading${state.backend === "qdrant" ? " (opens the Qdrant storage, a few seconds the first time)" : ""}…</p>`;
+  }
+  const pages = Math.max(1, Math.ceil(d.matched / PAGE)), page = Math.floor(d.offset / PAGE) + 1;
+  const rows = d.items.map(it => {
+    const open = c.open === it.n;
+    return `<div class="jrow${open ? " open" : ""}" data-jrow="${it.n}" role="button" tabindex="0" aria-expanded="${open}">${jsonRow(it)}</div>` + (open ? openRecord(it) : "");
+  }).join("");
+  return top + `<p>${esc(d.format)}</p>` +
+    kv([["Stored in", `<code>${esc(d.store)}</code>`], ["Records", fmt(d.total)], ...(d.bytes ? [["File size", (d.bytes / 1048576).toFixed(1) + " MB"]] : [])]) +
+    `<form class="jfilter" id="jform"><input id="jq" type="search" placeholder='filter: lora.md, "kind":"python"…' value="${esc(c.q)}" aria-label="Filter records"><button class="btn ghost" type="submit">Filter</button></form>
+    <div class="jpager"><button class="btn ghost" data-page="-1" type="button" ${d.offset === 0 ? "disabled" : ""} aria-label="Previous page">←</button>
+      <span>page ${fmt(page)} / ${fmt(pages)} · ${fmt(d.matched)} ${d.query ? "matching " : ""}records</span>
+      <button class="btn ghost" data-page="1" type="button" ${d.offset + PAGE >= d.matched ? "disabled" : ""} aria-label="Next page">→</button></div>
+    <div class="jl">${rows || `<p style="margin:6px">No record matches.</p>`}</div>
+    <p>Click a record to see it formatted and the text it points to.</p>`;
+}
+function openRecord(it) {
+  let pretty = it.line;
+  try { pretty = JSON.stringify(JSON.parse(it.line), null, 2); } catch { /* keep the raw line */ }
+  return `<div class="jopen"><h3>Record ${it.n}</h3><pre class="code">${jsonHl(pretty)}</pre>
+    <h3>Text it points to (cut from data/raw)</h3><pre>${esc(it.text || "(empty)")}</pre>
+    ${state.backend === "native" ? `<button class="btn ghost" type="button" data-mrow="${it.n}">Row ${it.n} of the BM25 matrix W →</button>` : ""}</div>`;
+}
+
+async function loadMatrix(row) {
+  state.mrow = row; state.mloading = true; state.merror = null;
+  if (state.tab === "matrix") renderPanel();
+  try { state.mdata = await api(`/matrix?row=${row}`); }
+  catch (e) { state.merror = e.message; }
+  state.mloading = false;
+  if (state.tab === "matrix") renderPanel();
+}
+const traceNative = () => state.trace && state.trace.backend === "native" ? state.trace : null;
+function heatHtml() {
+  const t = traceNative();
+  if (!t) return `<h3>The slice a question reads</h3><p>Run a question with the native backend: this shows the exact cells of W that the search adds up.</p>`;
+  const cols = t.retrieve.terms.filter(x => x.in_vocab).map(x => x.term);
+  const hits = t.retrieve.hits;
+  if (!cols.length || !hits.length) return `<h3>The slice a question reads</h3><p>No query term is in the vocabulary, so every score is 0.</p>`;
+  const max = Math.max(...hits.flatMap(h => cols.map(c => h.terms[c] || 0)), 1e-9);
+  const cell = v => {
+    const p = Math.round(v / max * 85);
+    return `<td style="background:color-mix(in srgb, var(--accent) ${p}%, transparent);${p > 50 ? "color:#fff" : ""}">${v ? v.toFixed(2) : "·"}</td>`;
+  };
+  return `<h3>The slice your question reads: W[rows, query columns]</h3>
+    <p>Search = for all ${fmt(t.retrieve.scored)} rows, add up the columns of the query terms, then keep the ${t.k} largest sums. Here are those ${hits.length} rows. Click a row to open it below.</p>
+    <div class="hscroll"><table class="heat"><tr><th>#</th><th>row</th><th style="text-align:left">chunk</th>${cols.map(c => `<th>${esc(c)}</th>`).join("")}<th>Σ score</th></tr>
+    ${hits.map((h, i) => `<tr data-mrow="${h.row}" tabindex="0"><td>${i + 1}</td><td>${h.row}</td><td class="f" title="${esc(h.file_path)}">${esc(h.file_path.split("/").pop())}</td>${cols.map(c => cell(h.terms[c] || 0)).join("")}<td><b>${h.score.toFixed(2)}</b></td></tr>`).join("")}
+    </table></div>`;
+}
+function rowHtml() {
+  const m = state.mdata;
+  const form = `<form class="jfilter" id="mform"><input id="mrowin" type="number" min="0" value="${state.mrow ?? 0}" aria-label="Row number"><button class="btn ghost" type="submit">Show row</button></form>`;
+  if (state.merror) return `<h3>One row = one chunk</h3>${form}<p class="err">${esc(state.merror)}</p>`;
+  if (!m) return `<h3>One row = one chunk</h3>${form}<p>Loading…</p>`;
+  const ch = m.chunk, top = m.cells[0];
+  const maxW = Math.max(...m.cells.map(c => c.w), 1e-9);
+  const norm = m.k1 * (1 - m.b + m.b * m.length / m.avgdl);
+  const calc = top ? `<div class="calc">W[${m.row}, "${esc(top.term)}"] = idf · tf·(k1+1) / (tf + k1·(1 − b + b·|d|/avgdl))<br>
+    = ${top.idf} · ${top.tf}·${(m.k1 + 1).toFixed(1)} / (${top.tf} + ${m.k1}·(1 − ${m.b} + ${m.b}·${m.length}/${m.avgdl}))<br>
+    = ${top.idf} · ${(top.tf * (m.k1 + 1)).toFixed(2)} / ${(top.tf + norm).toFixed(3)} = <b>${(top.idf * top.tf * (m.k1 + 1) / (top.tf + norm)).toFixed(4)}</b> (stored: ${top.w})<br>
+    idf = log(1 + (N − df + 0.5)/(df + 0.5)) = log(1 + (${fmt(m.shape[0])} − ${top.df} + 0.5)/(${top.df} + 0.5)) = ${top.idf}</div>` : "";
+  return `<h3>One row = one chunk${state.mloading ? " · loading…" : ""}</h3>${form}
+    <p><code>${esc(ch.file_path.replace("data/raw/vllm-0.10.1/", ""))}</code> · chars ${fmt(ch.first_character_index)}–${fmt(ch.last_character_index)} · ${esc(ch.kind)}${ch.context ? " · " + esc(ch.context.slice(0, 60)) : ""}</p>
+    ${kv([["Tokens in chunk |d|", fmt(m.length) + ` (average ${m.avgdl})`], ["Non-zero cells in this row", `${fmt(m.n_terms)} of ${fmt(m.shape[1])}`]])}
+    <h3>How the top cell is computed</h3>${calc}
+    <h3>Non-zero cells, largest first${m.cells.length < m.n_terms ? ` (top ${m.cells.length})` : ""}</h3>
+    <div class="hscroll"><table class="wtab"><tr><th>term</th><th>tf</th><th>df</th><th>idf</th><th>W</th></tr>
+    ${m.cells.map(c => `<tr><td class="t">${esc(c.term)}</td><td>${c.tf}</td><td>${fmt(c.df)}</td><td>${c.idf.toFixed(2)}</td><td><span class="wbar" style="width:${(c.w / maxW * 70).toFixed(1)}px"></span> ${c.w.toFixed(2)}</td></tr>`).join("")}</table></div>
+    <p>tf: how many times the term is in this chunk. df: in how many chunks it appears. A rare term (small df) gets a big idf and dominates the row.</p>
+    <details><summary>chunk text</summary><pre>${esc(m.text)}${m.truncated ? "\n…" : ""}</pre></details>`;
+}
+function matrixHtml() {
+  if (!state.mdata && !state.mloading && !state.merror) {
+    const t = traceNative();
+    setTimeout(() => loadMatrix(state.mrow ?? (t && t.retrieve.hits.length ? t.retrieve.hits[0].row : 0)));
+  }
+  const m = state.mdata;
+  const facts = m ? kv([["Shape", `${fmt(m.shape[0])} chunks × ${fmt(m.shape[1])} terms`],
+    ["Non-zero cells", `${fmt(m.nnz)} (${(m.density * 100).toFixed(3)} %)`],
+    ["As a dense float32 array", `${fmt(Math.round(m.dense_mb))} MB`],
+    ["bm25_weights.npz (sparse)", `${m.sparse_mb.toFixed(1)} MB`],
+    ["k1 / b / avgdl", `${m.k1} / ${m.b} / ${m.avgdl} tokens`]]) : "";
+  const steps = `1. file_chunker.chunk()             → ${m ? fmt(m.shape[0]) : "N"} chunks (chunks.jsonl)
+2. NativeIndexer.searchable_text()  → path words + context + chunk text
+3. tokenizer.tokenize()             → terms   (LoRAAdapter → lora, adapt)
+4. BM25Index.count_matrix()         → C[d,t] = times term t occurs in chunk d
+                                      vocab.setdefault(term, len(vocab)) = column id
+5. BM25Index.set_counts()           → df[t]  = chunks containing t
+                                      idf[t] = log(1 + (N − df + 0.5) / (df + 0.5))
+                                      W[d,t] = idf·tf·(k1+1) / (tf + k1·(1 − b + b·|d|/avgdl))
+6. bm25_repository.save()           → bm25_weights.npz (W)  bm25_counts.npz (C)
+                                      bm25_vocab.json (term → column)`;
+  return head("Native index · src/models/bm25_index.py", "The BM25 matrix W",
+      "One row per chunk, one column per vocabulary term. A cell is the BM25 weight of that term in that chunk, computed once by <code>index</code>. Almost every cell is 0, so only the non-zero ones are stored (scipy CSC: column by column, because a search reads whole columns).") +
+    facts + (m && m.words ? `<h3>Watch one row being built</h3><div class="anim" id="wanim">${animBody()}</div>` : "") +
+    `<h3>How index builds it</h3><pre class="code">${esc(steps)}</pre>` + heatHtml() + rowHtml();
+}
+
+/* ---------- hover preview ---------- */
+const tip = document.createElement("div");
+tip.className = "tip"; tip.setAttribute("role", "tooltip");
+document.body.appendChild(tip);
+const previews = {};
+function moveTip(ev) {
+  const w = tip.offsetWidth, h = tip.offsetHeight;
+  const x = Math.min(ev.clientX + 16, innerWidth - w - 8), y = ev.clientY + 18 + h > innerHeight ? ev.clientY - h - 12 : ev.clientY + 18;
+  tip.style.left = Math.max(8, x) + "px"; tip.style.top = Math.max(8, y) + "px";
+}
+function hideTip() { tip.style.display = "none"; tip.dataset.for = ""; }
+function showTip(id, ev) {
+  const b = state.backend, key = id + ":" + b;
+  tip.dataset.for = key;
+  tip.innerHTML = `<div class="kicker">${id === "chunker" ? "Chunker output" : "Index storage"} · ${bk()}</div><p>Loading records…</p>`;
+  tip.style.display = "block"; moveTip(ev);
+  previews[b] = previews[b] || api(`/chunks?backend=${b}&offset=0&limit=3`).catch(e => ({ error: e.message }));
+  previews[b].then(d => {
+    if (tip.dataset.for !== key) return;
+    if (d.error) { delete previews[b]; tip.innerHTML = `<p class="err">${esc(d.error)}</p>`; return; }
+    tip.innerHTML = `<div class="kicker">${id === "chunker" ? "Chunker output" : "Index storage"} · ${bk()}</div>
+      <code>${esc(d.store)}</code><div class="jl">${d.items.map(it => `<div class="jrow">${jsonRow(it)}</div>`).join("")}</div>
+      <p>… ${fmt(d.total)} records. Click the cube to browse them all${b === "native" && id === "index" ? ", or open the <b>Matrix W</b> tab" : ""}.</p>`;
+    moveTip(ev);
+  });
+}
+
+function tabsFor(id) {
+  const n = insideParts(id);
+  const tabs = [["inside", "Inside" + (n ? " · " + n.length : "")], ["data", "Live data"]];
+  if (CHUNK_CUBES.has(id)) tabs.push(["chunks", "Chunks"]);
+  if ((id === "index" || id === "retrieve") && state.backend === "native") tabs.push(["matrix", "Matrix W"]);
+  if (id === "index" && state.backend === "native") tabs.push(["vocab", "Vocab"], ["files", "Files"]);
+  return tabs;
+}
+function renderPanel() {
+  const tabs = tabsFor(state.sel);
+  if (!tabs.some(([k]) => k === state.tab)) state.tab = "inside";
+  const body = { inside: insideHtml, chunks: chunksHtml, matrix: matrixHtml, vocab: vocabHtml, files: filesHtml }[state.tab] || RENDER[state.sel];
+  panel.innerHTML = `<div class="tabs" role="tablist">${tabs.map(([k, label]) => `<button type="button" data-tab="${k}" aria-pressed="${state.tab === k}">${label}</button>`).join("")}</div>` + body();
+  panel.querySelectorAll("[data-cmp]").forEach(b => b.addEventListener("click", async () => {
+    b.disabled = true; b.textContent = "Computing…";
+    const other = b.dataset.cmp;
+    try { state.cmp = await api("/trace", { query: state.trace.query, k: state.trace.k, backend: other }); }
+    catch (e) { state.cmp = { error: e.message }; }
+    renderPanel();
+  }));
+}
+
+/* ---------- docker scene ---------- */
+function buildDocker(health) {
+  const svg = $("#dock");
+  svg.innerHTML = "";
+  const nodes = [
+    { id: "browser", gx: 0, gy: 0, type: "browser", title: "Browser", tag: "localhost:8080" },
+    { id: "viz", gx: 2.6, gy: 0, type: "infra", title: "rag-viz", tag: "nginx:1.27-alpine" },
+    { id: "engine", gx: 5.2, gy: 0, type: "shared", title: "rag-engine", tag: "python · torch CPU · Qdrant" },
+    { id: "proj", gx: 5.2, gy: 2.6, type: "volume", title: "project:ro", tag: "src/ + data/", slab: true },
+    { id: "hf", gx: 7.8, gy: 0, type: "volume", title: "hf-cache", tag: "Qwen3 weights", slab: true }
+  ];
+  const lPlate = el("g", {}, svg), lLinks = el("g", {}, svg), lC = el("g", {}, svg), lL = el("g", {}, svg);
+  drawPlate(lPlate, { x0: 1.7, x1: 6.1, y0: -0.95, y1: 0.95, text: "NETWORK rag-net · bridge" });
+  const N = Object.fromEntries(nodes.map(n => [n.id, n]));
+  const links = [["browser", "viz", ":8080 → :80"], ["viz", "engine", "/api → :8000"], ["engine", "proj", "mount"], ["engine", "hf", "mount"]];
+  links.forEach(([a, b, txt]) => {
+    el("path", { class: "link" + (b === "proj" || b === "hf" ? " dash" : ""), d: linkPath(N[a], N[b]) }, lLinks);
+    const [x1, y1] = iso(N[a].gx, N[a].gy), [x2, y2] = iso(N[b].gx, N[b].gy);
+    const dx = x2 - x1, dy = y2 - y1, len = Math.hypot(dx, dy);
+    let ang = Math.atan2(dy, dx) * 180 / Math.PI;
+    if (ang > 90) ang -= 180; else if (ang < -90) ang += 180;
+    let nx = dy / len, ny = -dx / len;                 // normal, pointing up
+    if (ny > 0) { nx = -nx; ny = -ny; }
+    const mx = (x1 + x2) / 2 + nx * 9, my = (y1 + y2) / 2 + ny * 9;
+    const t = el("text", { class: "portlbl", x: mx, y: my, "text-anchor": "middle", transform: `rotate(${ang.toFixed(2)} ${mx} ${my})` }, lL);
+    t.textContent = txt;
+  });
+  [...nodes].sort((a, b) => (a.gx + a.gy) - (b.gx + b.gy)).forEach(n => {
+    const g = drawCube(lC, n, { static: true, h: n.slab ? 16 : H });
+    paintCube(g, n.type);
+    const [cx, cy] = iso(n.gx, n.gy);
+    const y = cy - (n.slab ? 16 : H) - E / 2 - 26;
+    el("text", { class: "lbl", x: cx, y, "text-anchor": "middle" }, lL).textContent = n.title;
+    el("text", { class: "tag", x: cx, y: y + 15, "text-anchor": "middle" }, lL).textContent = n.tag;
+  });
+  const [ex, ey] = iso(5.2, 0);
+  const ok = health && health.status === "ok";
+  el("circle", { cx: ex + E - 4, cy: ey - H - 4, r: 6, fill: ok ? "var(--good)" : "var(--bad)", stroke: "var(--surface)", "stroke-width": 2 }, lL);
+  fitViewBox(svg);
+}
+
+/* ---------- stats table ---------- */
+function renderStats() {
+  const s = state.stats, box = $("#stats");
+  if (!s) { box.innerHTML = `<p class="err">Cannot reach rag-engine.</p>`; return; }
+  const n = s.native || {}, l = s.langchain || {}, q = s.qdrant || {};
+  const row = (name, a, b, c) => `<tr><td>${name}</td><td class="n">${a}</td><td class="n">${b}</td><td class="n">${c}</td></tr>`;
+  const chars = v => v == null ? "–" : fmt(v) + " chars";
+  box.innerHTML = `<table><tr><th></th><th>native</th><th>LangChain</th><th>Qdrant</th></tr>
+    ${row("search by", "BM25 terms", "BM25 terms", "MiniLM vector")}
+    ${row("max_chunk_size", n.max_chunk_size || "?", l.max_chunk_size || "?", q.max_chunk_size || "?")}
+    ${row("chunks", fmt(n.chunks), fmt(l.chunks), fmt(q.chunks))}
+    ${row("files", fmt(n.files), fmt(l.files), "–")}
+    ${row("vocabulary / dim", fmt(n.vocab) + " terms", fmt(l.vocab) + " terms", q.dim ? q.dim + "-d" : "–")}
+    ${row("largest chunk", chars(n.max_chars), chars(l.max_chars), "same as native")}
+    ${row("average chunk", chars(n.avg_chars), chars(l.avg_chars), "same as native")}
+    ${row("scoring", `k1 ${n.k1} / b ${n.b}`, `k1 ${l.k1} / b ${l.b}`, esc(q.distance || "cosine"))}
+    ${row("index load", fms(n.load_ms) || "–", fms(l.load_ms) || "–", fms(q.load_ms) || "on demand")}
+    ${row("recall@5 code", "0.848", "0.788", "0.515")}
+    ${row("recall@5 docs", "0.860", "0.870", "0.620")}
+  </table><p style="color:var(--muted);font-size:12px;margin:8px 0 0">Recall comes from the project README (public datasets, k = 10). Everything else is computed from the loaded indexes.</p>
+  ${[n, l, q].filter(x => x.error).map(x => `<p class="err">${esc(x.error)}</p>`).join("")}`;
+}
+
+function openMatrixRow(row) {
+  if (state.sel !== "index" && state.sel !== "retrieve") select("index", "matrix");
+  else { state.tab = "matrix"; renderPanel(); }
+  loadMatrix(row);
+}
+panel.addEventListener("click", e => {
+  const vt = e.target.closest("[data-vterm]");
+  if (vt) { loadVocab(vt.dataset.vterm, state.vocab.prefix); return; }
+  const an = e.target.closest("[data-anim]");
+  if (an) { animCmd(an.dataset.anim); return; }
+  const t = e.target.closest("[data-tab]");
+  if (t) { state.tab = t.dataset.tab; renderPanel(); return; }
+  const p = e.target.closest("[data-part]");
+  if (p) { state.part = Number(p.dataset.part); renderPanel(); return; }
+  const j = e.target.closest("[data-jrow]");
+  if (j) { const n = Number(j.dataset.jrow); state.chunks.open = state.chunks.open === n ? null : n; renderPanel(); return; }
+  const pg = e.target.closest("[data-page]");
+  if (pg) { const c = state.chunks; c.offset = Math.max(0, c.offset + Number(pg.dataset.page) * PAGE); c.open = null; loadChunks(); return; }
+  const m = e.target.closest("[data-mrow]");
+  if (m) openMatrixRow(Number(m.dataset.mrow));
+});
+panel.addEventListener("keydown", e => {
+  if (e.key !== "Enter" && e.key !== " ") return;
+  const p = e.target.closest("[data-part], [data-jrow], tr[data-mrow]");
+  if (!p) return;
+  e.preventDefault(); p.click();
+});
+panel.addEventListener("submit", e => {
+  e.preventDefault();
+  if (e.target.id === "jform") {
+    const c = state.chunks; c.q = $("#jq").value.trim(); c.offset = 0; c.open = null; loadChunks();
+  } else if (e.target.id === "vform") {
+    const t = $("#vq").value.trim();
+    if (t) loadVocab(t, "");
+  } else if (e.target.id === "mform") {
+    const v = Number($("#mrowin").value);
+    if (Number.isInteger(v) && v >= 0) loadMatrix(v);
+  }
+});
+/* ---------- animation: how one row of W is built ---------- */
+const ANIM_TRACK = 10;
+const ANIM_PHASES = ["1 · tokens → tf", "2 · df → idf", "3 · |d| / avgdl", "4 · W", "5 · store"];
+const ANIM_MS = { start: 1600, word: 110, rest: 1400, idf: 1100, norm: 2600, w: 1100, store: 3000 };
+function animFrames(m) {
+  const n = Math.min(ANIM_TRACK, m.cells.length);
+  const frames = [{ ph: 0, kind: "start" }];
+  m.words.forEach((_, i) => frames.push({ ph: 0, kind: "word", i }));
+  if (m.n_words > m.words.length) frames.push({ ph: 0, kind: "rest" });
+  for (let j = 0; j < n; j++) frames.push({ ph: 1, kind: "idf", j });
+  frames.push({ ph: 2, kind: "norm" });
+  for (let j = 0; j < n; j++) frames.push({ ph: 3, kind: "w", j });
+  frames.push({ ph: 4, kind: "store" });
+  return frames;
+}
+function animState() {
+  const m = state.mdata;
+  if (!state.anim || state.anim.row !== m.row) {
+    if (state.anim) clearTimeout(state.anim.timer);
+    state.anim = { row: m.row, frames: animFrames(m), f: 0, playing: false, speed: (state.anim && state.anim.speed) || 1, timer: null };
+  }
+  return state.anim;
+}
+function animBody() {
+  const m = state.mdata, a = animState(), fr = a.frames[a.f];
+  const tracked = m.cells.slice(0, ANIM_TRACK), names = new Set(tracked.map(c => c.term));
+  const N = m.shape[0], norm = m.k1 * (1 - m.b + m.b * m.length / m.avgdl);
+  const counting = fr.ph === 0 && fr.kind !== "rest";
+  const upto = fr.kind === "word" ? fr.i : -1;
+  const tf = {}; let seen = 0; const distinct = new Set();
+  if (counting) for (let i = 0; i <= upto; i++) for (const t of m.words[i][1]) { tf[t] = (tf[t] || 0) + 1; seen++; distinct.add(t); }
+  const cur = fr.kind === "word" ? m.words[fr.i] : null, curSet = new Set(cur ? cur[1] : []);
+  const tfOf = c => counting ? (tf[c.term] || 0) : c.tf;
+  const shown = (ph, j) => fr.ph > ph || (fr.ph === ph && j <= fr.j);
+  const q = `<td class="unk">?</td>`;
+  const maxW = Math.max(...tracked.map(c => c.w), 1e-9);
+  const rows = tracked.map((c, j) => {
+    const now = (fr.kind === "idf" || fr.kind === "w") && fr.j === j;
+    const flash = curSet.has(c.term) ? ` class="flash"` : "";
+    return `<tr class="${now ? "now" : ""}"><td>${esc(c.term)}</td><td${flash}>${tfOf(c)}</td>
+      ${shown(1, j) ? `<td>${fmt(c.df)}</td><td>${c.idf.toFixed(2)}</td>` : q + q}
+      ${shown(3, j) ? `<td><span class="wbar" style="width:${(c.w / maxW * 46).toFixed(1)}px"></span> ${c.w.toFixed(2)}</td>` : q}</tr>`;
+  }).join("");
+  const others = counting ? [...distinct].filter(t => !names.has(t)).length : m.n_terms - tracked.length;
+  let note = "", flow = "";
+  if (fr.kind === "start") note = `Row ${m.row} of W starts empty. <code>index</code> takes the chunk text plus its path words and context (<code>searchable_text</code>) and reads it word by word.`;
+  else if (fr.kind === "word") {
+    note = `Word ${fr.i + 1} of ${fmt(m.n_words)}: <code>tokenizer.tokenize()</code> splits identifiers, lowercases, drops stop words and stems. Every term that comes out adds 1 to its tf.`;
+    flow = `<b>${esc(cur[0])}</b> → ` + (cur[1].length ? cur[1].map(t => `<span class="tk">${esc(t)}</span>`).join(" ") : `<span class="tk drop">stop word, dropped</span>`);
+  } else if (fr.kind === "rest") note = `…the remaining ${fmt(m.n_words - m.words.length)} words are counted the same way. The tf column now holds the final counts: row ${m.row} of the count matrix C.`;
+  else if (fr.kind === "idf") {
+    const c = tracked[fr.j];
+    note = `df("${esc(c.term)}") = ${fmt(c.df)}: the term appears in ${fmt(c.df)} of ${fmt(N)} chunks (that is a column of C, not this row).`;
+    flow = `idf = log(1 + (${fmt(N)} − ${fmt(c.df)} + 0.5) / (${fmt(c.df)} + 0.5)) = <b>${c.idf.toFixed(3)}</b> ${c.df < 50 ? "· rare → strong" : c.df > 2000 ? "· common → weak" : ""}`;
+  } else if (fr.kind === "norm") {
+    note = `The chunk has |d| = ${fmt(m.length)} terms, the average chunk has ${m.avgdl}. Longer chunks contain more words by chance, so each occurrence counts a little less.`;
+    flow = `factor = k1·(1 − b + b·|d|/avgdl) = ${m.k1}·(1 − ${m.b} + ${m.b}·${m.length}/${m.avgdl}) = <b>${norm.toFixed(3)}</b>`;
+  } else if (fr.kind === "w") {
+    const c = tracked[fr.j];
+    note = `Cell W[${m.row}, "${esc(c.term)}"]: tf is saturated (the 10th occurrence adds far less than the 1st) and multiplied by idf.`;
+    flow = `W = ${c.idf.toFixed(3)} · ${c.tf}·${(m.k1 + 1).toFixed(1)} / (${c.tf} + ${norm.toFixed(3)}) = <b>${c.w.toFixed(3)}</b>`;
+  } else {
+    note = `Only the ${fmt(m.n_terms)} non-zero cells of this row are written, as (column, value) pairs. The other ${fmt(m.shape[1] - m.n_terms)} columns are 0 and cost nothing: the whole W is ${m.sparse_mb.toFixed(1)} MB on disk instead of ${fmt(Math.round(m.dense_mb))} MB.`;
+    flow = tracked.slice(0, 5).map(c => `<span class="tk">(${fmt(c.col)}, ${c.w.toFixed(2)})</span>`).join(" ") + " …";
+  }
+  const lo = fr.kind === "word" ? Math.max(0, fr.i - 34) : 0, hi = fr.kind === "word" ? fr.i + 1 : (counting ? 0 : m.words.length);
+  const words = fr.ph === 0 ? m.words.slice(lo, hi).map(([w, ts], k) => {
+    const cls = lo + k === upto ? "now" : ts.some(t => names.has(t)) ? "hit" : "";
+    return `<span class="w ${cls}">${esc(w)}</span>`;
+  }).join("") : "";
+  const ticks = m.cells.map((c, j) => {
+    const on = fr.ph === 4 || (fr.ph === 3 && j < tracked.length && j <= fr.j);
+    if (!on) return "";
+    const h = 4 + c.w / m.cells[0].w * 22, x = c.col / m.shape[1] * 1000;
+    return `<rect x="${x.toFixed(1)}" y="${(30 - h).toFixed(1)}" width="3" height="${h.toFixed(1)}" fill="var(--accent)"${fr.kind === "w" && j === fr.j ? ` style="fill:var(--packet)"` : ""}/>`;
+  }).join("");
+  return `<div class="actl">
+      <button class="btn ghost" type="button" data-anim="restart" aria-label="Restart">⏮</button>
+      <button class="btn ghost" type="button" data-anim="back" aria-label="Previous step">◀</button>
+      <button class="btn" type="button" data-anim="toggle">${a.playing ? "⏸ Pause" : a.f ? "▶ Play" : "▶ Build row " + m.row}</button>
+      <button class="btn ghost" type="button" data-anim="next" aria-label="Next step">▶|</button>
+      <input type="range" min="0" max="${a.frames.length - 1}" value="${a.f}" data-anim-seek aria-label="Animation position">
+      <select data-anim-speed aria-label="Speed">${[0.5, 1, 2, 4].map(v => `<option value="${v}"${v === a.speed ? " selected" : ""}>${v}×</option>`).join("")}</select>
+    </div>
+    <div class="aphase">${ANIM_PHASES.map((p, i) => `<span class="${i === fr.ph ? "on" : i < fr.ph ? "done" : ""}">${p}</span>`).join("")}</div>
+    <p class="anote">${note}</p>
+    ${fr.ph === 0 ? `<div class="words">${words || `<span class="w">${esc(m.chunk.file_path.split("/").pop())} …</span>`}</div>` : ""}
+    <div class="flow">${flow}</div>
+    <table class="atab"><tr><th>term</th><th>tf</th><th>df</th><th>idf</th><th>W</th></tr>${rows}</table>
+    <p style="font-size:12px;margin:6px 0 0">${counting ? `${fmt(seen)} terms counted so far` : `|d| = ${fmt(m.length)} terms`} · + ${fmt(Math.max(0, others))} other distinct terms not shown</p>
+    <svg class="rowstrip" viewBox="0 0 1000 34" preserveAspectRatio="none" role="img" aria-label="Row ${m.row} of W across all ${fmt(m.shape[1])} columns">
+      <rect x="0" y="30" width="1000" height="2" fill="var(--line)"/>${ticks}</svg>
+    <p style="font-size:11.5px;margin:0;color:var(--muted)">Row ${m.row} across all ${fmt(m.shape[1])} columns of W (top ${m.cells.length} cells drawn). Almost all of it is empty.</p>`;
+}
+function animRender() {
+  const el = $("#wanim");
+  if (!el) { if (state.anim) { state.anim.playing = false; clearTimeout(state.anim.timer); } return; }
+  el.innerHTML = animBody();
+}
+function animTick() {
+  const a = state.anim;
+  clearTimeout(a.timer);
+  if (!a.playing) return;
+  if (a.f >= a.frames.length - 1) { a.playing = false; animRender(); return; }
+  a.f++; animRender();
+  if (a.playing) a.timer = setTimeout(animTick, ANIM_MS[a.frames[a.f].kind] / a.speed);
+}
+function animCmd(cmd) {
+  const a = state.anim;
+  if (!a) return;
+  clearTimeout(a.timer);
+  if (cmd === "toggle") {
+    a.playing = !a.playing;
+    if (a.playing && a.f >= a.frames.length - 1) a.f = 0;
+  } else {
+    a.playing = false;
+    if (cmd === "restart") a.f = 0;
+    else if (cmd === "back") a.f = Math.max(0, a.f - 1);
+    else if (cmd === "next") a.f = Math.min(a.frames.length - 1, a.f + 1);
+  }
+  animRender();
+  if (a.playing) a.timer = setTimeout(animTick, ANIM_MS[a.frames[a.f].kind] / a.speed);
+}
+panel.addEventListener("input", e => {
+  const a = state.anim;
+  if (!a) return;
+  if (e.target.matches("[data-anim-seek]")) { clearTimeout(a.timer); a.playing = false; a.f = Number(e.target.value); animRender(); }
+  else if (e.target.matches("[data-anim-speed]")) a.speed = Number(e.target.value);
+});
+
+/* ---------- resizable side panel ---------- */
+const gutter = $("#gutter"), mainEl = gutter.parentElement;
+const PANEL_MIN = 320, PANEL_DEFAULT = 440, SCENE_MIN = 360, PANEL_KEY = "rag-viz-panel-width";
+const panelMax = () => Math.max(PANEL_MIN, mainEl.clientWidth - SCENE_MIN - 16);
+function setPanelWidth(w, save) {
+  w = Math.round(Math.min(panelMax(), Math.max(PANEL_MIN, w)));
+  mainEl.style.setProperty("--panel-w", w + "px");
+  gutter.setAttribute("aria-valuemin", PANEL_MIN);
+  gutter.setAttribute("aria-valuemax", panelMax());
+  gutter.setAttribute("aria-valuenow", w);
+  if (save) try { localStorage.setItem(PANEL_KEY, String(w)); } catch { /* storage blocked */ }
+  return w;
+}
+const panelWidth = () => panel.getBoundingClientRect().width;
+try { const w = Number(localStorage.getItem(PANEL_KEY)); setPanelWidth(w || PANEL_DEFAULT, false); } catch { setPanelWidth(PANEL_DEFAULT, false); }
+gutter.addEventListener("pointerdown", e => {
+  if (e.button !== 0) return;
+  e.preventDefault();
+  gutter.setPointerCapture(e.pointerId);
+  const right = mainEl.getBoundingClientRect().right, half = gutter.offsetWidth / 2 + 4;
+  gutter.classList.add("drag"); document.body.classList.add("resizing");
+  const move = ev => setPanelWidth(right - ev.clientX - half, false);
+  const done = () => {
+    gutter.removeEventListener("pointermove", move);
+    gutter.classList.remove("drag"); document.body.classList.remove("resizing");
+    setPanelWidth(panelWidth(), true);
+  };
+  gutter.addEventListener("pointermove", move);
+  gutter.addEventListener("pointerup", done, { once: true });
+  gutter.addEventListener("pointercancel", done, { once: true });
+});
+gutter.addEventListener("keydown", e => {
+  const step = e.shiftKey ? 96 : 24;
+  const keys = { ArrowLeft: panelWidth() + step, ArrowRight: panelWidth() - step, Home: panelMax(), End: PANEL_MIN };
+  if (!(e.key in keys)) return;
+  e.preventDefault();
+  setPanelWidth(keys[e.key], true);
+});
+gutter.addEventListener("dblclick", () => setPanelWidth(PANEL_DEFAULT, true));
+addEventListener("resize", () => setPanelWidth(panelWidth(), false));
+
+/* ---------- vocabulary (bm25_vocab.json) ---------- */
+async function loadVocab(term, prefix) {
+  const v = state.vocab;
+  const seq = v.seq = (v.seq || 0) + 1;      // ignore answers to older lookups
+  v.term = term; v.prefix = prefix || ""; v.loading = true; v.error = null;
+  if (state.tab === "vocab") renderPanel();
+  let data = null, error = null;
+  try { data = await api(`/vocab?term=${encodeURIComponent(term)}&prefix=${encodeURIComponent(v.prefix)}`); }
+  catch (e) { error = e.message; }
+  if (seq !== v.seq) return;
+  v.data = data; v.error = error; v.loading = false;
+  if (state.tab === "vocab") renderPanel();
+}
+function vocabHtml() {
+  const v = state.vocab, d = v.data;
+  if (!d && !v.loading && !v.error) setTimeout(() => loadVocab("LoRA"));
+  const top = head("Native index · bm25_vocab.json", "Vocabulary: term → column of W",
+    "Every distinct term of the corpus gets one column number, in the order <code>count_matrix()</code> first met it. A search only reads the columns of its query terms, so this dictionary is the entry point into W.");
+  const form = `<form class="jfilter" id="vform"><input id="vq" type="search" value="${esc(v.term || "")}" placeholder="a word: LoRA, scheduler, the…" aria-label="Word to look up"><button class="btn ghost" type="submit">Look up</button></form>`;
+  if (v.error) return top + form + `<p class="err">${esc(v.error)}</p>`;
+  if (!d) return top + form + `<p>Loading the vocabulary…</p>`;
+  const toks = d.tokens.length ? d.tokens.map(t => `<span class="tk">${esc(t)}</span>`).join(" ") : `<span class="tk drop">nothing: stop word</span>`;
+  let body = `<div class="flow"><b>${esc(d.query)}</b> → tokenize() → ${toks}</div>`;
+  if (!d.found) {
+    body += `<p>${d.tokens.length ? `“${esc(d.tokens[0])}” is not in the vocabulary: no chunk contains it, so it has no column and adds 0 to every score.` : "Stop words are removed before indexing and before searching, so they have no column at all."}</p>`;
+  } else {
+    const maxW = Math.max(...d.cells.map(c => c.w), 1e-9);
+    body += kv([["Line in bm25_vocab.json", `<code>${esc(d.json_entry.slice(1, -1))}</code>`],
+      ["Column of W", `${fmt(d.col)} of ${fmt(d.n_terms)}`],
+      ["df (chunks containing it)", `${fmt(d.df)} of ${fmt(d.n_docs)} (${(d.df / d.n_docs * 100).toFixed(2)} %)`],
+      ["idf", `${d.idf} ${d.df < 50 ? "· rare, strong" : d.df > 2000 ? "· common, weak" : ""}`]]) +
+      `<h3>Column ${fmt(d.col)} of W: the ${fmt(d.df)} chunks that contain “${esc(d.term)}”</h3>
+      <p>Stored in bm25_weights.npz as one contiguous slice (CSC). The ${d.cells.length < d.df ? d.cells.length + " heaviest" : "cells"} below; click a row to open it in Matrix W.</p>
+      <div class="hscroll"><table class="heat"><tr><th>row</th><th style="text-align:left">chunk</th><th>tf</th><th>|d|</th><th>W</th></tr>
+      ${d.cells.map(c => `<tr data-mrow="${c.row}" tabindex="0"><td>${c.row}</td><td class="f" title="${esc(c.file_path)}${c.context ? " · " + esc(c.context) : ""}">${esc(c.file_path.replace("data/raw/vllm-0.10.1/", ""))}</td><td>${c.tf}</td><td>${c.length}</td><td style="text-align:left"><span class="wbar" style="width:${(c.w / maxW * 60).toFixed(1)}px"></span> ${c.w.toFixed(2)}</td></tr>`).join("")}</table></div>
+      <p>Same tf, different W: a short chunk (small |d|) gets more weight than a long one.</p>`;
+  }
+  if (d.matches.length) body += `<h3>Neighbours in the vocabulary (starting with “${esc(d.prefix)}”)</h3><div class="chips vchips">${d.matches.map(m => `<button class="btn ghost" type="button" data-vterm="${esc(m.term)}">${esc(m.term)} <small>col ${fmt(m.col)} · df ${fmt(m.df)}</small></button>`).join("")}</div>`;
+  return top + form + body;
+}
+
+/* ---------- files on disk ---------- */
+const FILE_ROLE = {
+  "chunks.jsonl": ["mandatory", "one chunk per line (path + character span, no text). Line n = row n of W."],
+  "bm25_weights.npz": ["mandatory", "the matrix W, scipy CSC: stored column by column, because a search reads whole columns."],
+  "bm25_vocab.json": ["mandatory", "term → column number of W, plus k1 and b."],
+  "meta.json": ["mandatory", "build settings (max_chunk_size, …) and the build id."],
+  "bm25_counts.npz": ["bonus 3", "raw counts C (tf), scipy CSR. Kept so an incremental build can reuse unchanged files."],
+  "manifest.json": ["bonus 3", "sha1 of every indexed file: tells which files changed."],
+  "embeddings.npy": ["bonus 1", "MiniLM vectors: one row of 384 float32 per chunk."],
+  "semantic_meta.json": ["bonus 1", "model name and build id the vectors belong to."],
+  "query_cache.sqlite": ["bonus 4", "SQLite cache of search results and answers."],
+};
+async function loadFiles() {
+  state.files.loading = true;
+  try { state.files.data = await api("/files"); } catch (e) { state.files.error = e.message; }
+  state.files.loading = false;
+  if (state.tab === "files") renderPanel();
+}
+const mb = n => n >= 1 << 20 ? (n / (1 << 20)).toFixed(1) + " MB" : n >= 1024 ? (n / 1024).toFixed(1) + " KB" : n + " B";
+function npzNote(f) {
+  const a = Object.fromEntries(f.arrays.map(x => [x.name, x]));
+  if (!a.indptr || !a.format) return "";
+  const fmtName = a.format.head[0], [rows, cols] = a.shape.head;
+  const along = fmtName === "csc" ? "column" : "row", n = fmtName === "csc" ? cols : rows;
+  const p = a.indptr.head, full = [];
+  for (let i = 1; i < p.length; i++) if (p[i] - p[i - 1] === (fmtName === "csc" ? rows : cols)) full.push(i - 1);
+  return `<p class="fnote">How to read it: the cells of ${along} i are <code>data[indptr[i] : indptr[i+1]]</code>, and <code>indices</code> holds their ${fmtName === "csc" ? "row" : "column"} numbers. ${fmt(n)} ${along}s → indptr has ${fmt(n + 1)} entries. Only the ${fmt(a.data.shape[0])} non-zero cells are stored, never the ${fmt(rows * cols)} of the full grid.</p>` +
+    (full.length && fmtName === "csc" ? `<p class="fnote">Columns ${full.join(", ")} hold all ${fmt(rows)} rows: path words such as <code>data</code>, <code>raw</code>, <code>vllm</code> are in every chunk's searchable text. Their idf is ≈ 0.00002, so they never change a ranking.</p>` : "");
+}
+const FILE_ORDER = Object.keys(FILE_ROLE);
+const fileRank = f => { const i = FILE_ORDER.indexOf(f.name); return i < 0 ? 99 : i; };
+function fileHtml(f) {
+  const role = FILE_ROLE[f.name] || ["", ""];
+  let detail = "";
+  if (f.error) detail = `<p class="err">${esc(f.error)}</p>`;
+  else if (f.format === "npz") detail = `<div class="hscroll"><table class="wtab"><tr><th>array</th><th>dtype</th><th>shape</th><th>first values</th></tr>${f.arrays.map(a => `<tr><td class="t">${esc(a.name)}</td><td>${esc(a.dtype)}</td><td>${a.shape.length ? a.shape.map(fmt).join(" × ") : "scalar"}</td><td>${esc(a.head.join(", "))}${a.shape.length && a.shape[0] > a.head.length ? ", …" : ""}</td></tr>`).join("")}</table></div>` + npzNote(f);
+  else if (f.format === "npy") detail = kv([["dtype", esc(f.dtype)], ["shape", f.shape.map(fmt).join(" × ")], ["row 0 starts", `<code>${esc(f.head.slice(0, 6).join(", "))}, …</code>`]]);
+  else if (f.format === "jsonl") detail = `<p class="fnote">${fmt(f.lines)} lines. The first ones:</p><pre class="code">${f.head.map(jsonHl).join("\n")}</pre>`;
+  else if (f.format === "json") detail = `<p class="fnote">${f.keys != null ? fmt(f.keys) + " top-level keys. " : ""}Start of the file:</p><pre>${esc(f.head)}</pre>`;
+  return `<div class="fcard"><div class="fhead"><code>${esc(f.name)}</code><span class="fsize">${mb(f.bytes)}</span>${role[0] ? `<span class="ftag ${role[0] === "mandatory" ? "" : "b"}">${role[0]}</span>` : ""}</div><p>${role[1]}</p>${detail}</div>`;
+}
+function filesHtml() {
+  const f = state.files;
+  if (!f.data && !f.loading && !f.error) setTimeout(loadFiles);
+  const top = head("Native index · data/processed/native", "Files on disk",
+    "No database: the index is a handful of files. <code>index</code> writes them once; <code>search</code> loads them into memory and does the maths with numpy / scipy.");
+  if (f.error) return top + `<p class="err">${esc(f.error)}</p>`;
+  if (!f.data) return top + `<p>Reading the files…</p>`;
+  return top + kv([["Directory", `<code>${esc(f.data.dir)}</code>`], ["Files", fmt(f.data.files.length)], ["Total", mb(f.data.total)]]) +
+    [...f.data.files].sort((a, b) => fileRank(a) - fileRank(b)).map(fileHtml).join("");
+}
+
+async function loadInside() {
+  try { state.inside = await api("/inside"); } catch { state.inside = false; }
+  renderPanel();
+}
+async function refreshHealth() {
+  try { state.health = await api("/health"); } catch { state.health = null; }
+  buildDocker(state.health);
+}
+async function loadStats() {
+  try { state.stats = await api("/stats"); } catch { state.stats = null; }
+  renderStats(); renderPanel(); paintAll();
+}
+
+/* ---------- wiring ---------- */
+document.querySelectorAll(".seg button").forEach(b => b.addEventListener("click", () => {
+  if (state.running) return;
+  state.backend = b.dataset.b;
+  document.querySelectorAll(".seg button").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+  state.trace = null; state.gen = null; state.cmp = null; state.status = {}; state.timings = {};
+  state.chunks = freshChunks();
+  Object.values(linkEls).forEach(p => p.classList.remove("lit"));
+  paintAll(); renderPanel();
+}));
+$("#qform").addEventListener("submit", e => { e.preventDefault(); run(); });
+kSel.addEventListener("change", paintAll);
+const ex = $("#examples");
+EXAMPLES.forEach(q => {
+  const c = document.createElement("button");
+  c.type = "button"; c.className = "chip"; c.textContent = q;
+  c.addEventListener("click", () => { qInput.value = q; run(); });
+  ex.appendChild(c);
+});
+$("#legend").innerHTML = [["data", "data"], ["shared", "shared code"], ["native", "native"], ["langchain", "LangChain"], ["qdrant", "Qdrant"], ["llm", "LLM"], ["lib", "library code (inside)"]]
+  .map(([t, n]) => `<span><i style="background:${faceColor(t, "top")}"></i>${n}</span>`).join("");
+
+/* ---------- guided tour: one real question through the whole pipeline ---------- */
+const TOUR_Q = "How do I enable speculative decoding in vLLM?";
+const TOUR_K = 5;
+const tourEl = $("#tour"), tourBtn = $("#tourBtn");
+const tour = { on: false, i: 0, auto: true, timer: null, token: 0, ctx: null };
+const short = p => p.replace("data/raw/vllm-0.10.1/", "");
+const idfOf = (df, n) => Math.log(1 + (n - df + 0.5) / (df + 0.5));
+const chips = (xs, cls = "") => xs.map(x => `<span class="tk ${cls}">${esc(x)}</span>`).join(" ");
+
+const TOUR_STEPS = [
+  { on: [], ms: 6500, phase: "Start", title: "One real question, end to end",
+    body: c => `<p>We follow <b>“${esc(c.q)}”</b> through the pipeline, with the real numbers of this index.</p>
+      <p>First the <b>offline</b> part (top plate): it runs once, with <code>index</code>. Then the <b>online</b> part (bottom plate): it runs for every question.</p>` },
+  { on: ["corpus"], ms: 6500, phase: "Offline · 1", title: "Corpus: the vLLM source code", panel: ["corpus"],
+    body: c => `<p><b>${fmt(c.s.files)}</b> files of vLLM 0.10.1 (<code>.py .md .rst .txt</code>) in <code>data/raw</code>. This is all the model will ever know about vLLM: Qwen3-0.6B was not trained on it.</p>` },
+  { on: ["chunker"], links: [["corpus", "chunker"]], ms: 8000, phase: "Offline · 2", title: "Chunker: files → chunks", panel: ["chunker", "chunks"],
+    body: c => `<p>Python is cut along the syntax tree (one function / class per chunk), Markdown at its headings, the rest on blank lines. No chunk is over <b>${fmt(c.s.max_chunk_size)}</b> characters.</p>
+      ${kv([["Chunks", `<b>${fmt(c.s.chunks)}</b>`], ["Kinds", Object.entries(c.s.kinds).map(([k, v]) => `${k} ${fmt(v)}`).join(" · ")], ["Average size", `${c.s.avg_chars} chars`]])}
+      <p>A chunk stores only its address (file + character span), not its text. → <code>chunks.jsonl</code></p>` },
+  { on: ["index"], links: [["chunker", "index"]], ms: 9000, phase: "Offline · 3", title: "Index: the BM25 matrix W", panel: ["index", "files"],
+    body: c => `<p>Every chunk is tokenized, its words are counted, and each count becomes a BM25 weight. Result: one row per chunk, one column per term.</p>
+      ${kv([["W", `${fmt(c.m.shape[0])} × ${fmt(c.m.shape[1])}`], ["Non-zero cells", `${fmt(c.m.nnz)} (${(c.m.density * 100).toFixed(2)} %)`], ["On disk", `${c.m.sparse_mb.toFixed(1)} MB instead of ${fmt(Math.round(c.m.dense_mb))} MB`]])}
+      <p>No database: a few files in <code>data/processed/native</code>, loaded into memory when a search starts. Offline part done.</p>` },
+  { on: ["query"], ms: 5500, phase: "Online · 1", title: "The question arrives", panel: ["query", "data"],
+    body: c => `<p class="tq">“${esc(c.q)}”</p><p>k = ${TOUR_K}: we want the ${TOUR_K} best places in the code. Nothing is generated yet; first we have to find where vLLM talks about this.</p>` },
+  { on: ["tokenize"], links: [["query", "tokenize"]], ms: 8500, phase: "Online · 2", title: "Tokenizer: words → terms", panel: ["tokenize", "data"],
+    body: c => {
+      const kept = new Set(c.t.tokenize.tokens);
+      return `<p>The same tokenizer as at indexing time, so the question and the chunks speak the same language.</p>
+      <div class="flow">${c.t.tokenize.words.map(w => `<span class="tk ${c.t.tokenize.tokens.some(t => w.toLowerCase().includes(t)) ? "" : "drop"}">${esc(w)}</span>`).join(" ")}</div>
+      <div class="flow">→ ${chips(c.t.tokenize.tokens)}</div>
+      <p>Stop words (“how”, “do”, “I”, “in”) disappear; <code>vLLM</code> is split into its parts and lower-cased. ${kept.size} terms remain.</p>`;
+    } },
+  { on: ["retrieve", "index"], links: [["tokenize", "retrieve"], ["index", "retrieve"]], ms: 9500, phase: "Online · 3", title: "Retriever: one column of W per term", panel: ["index", "vocab"], vocab: "speculative",
+    body: c => {
+      const n = c.m.shape[0], terms = c.t.retrieve.terms.filter(x => x.in_vocab);
+      return `<p><code>bm25_vocab.json</code> turns every term into a column number. Only these ${terms.length} columns of W are read: the other ${fmt(c.m.shape[1] - terms.length)} are ignored.</p>
+      <table class="atab"><tr><th>term</th><th>df</th><th>idf</th></tr>${terms.sort((a, b) => a.df - b.df).map(x => `<tr><td>${esc(x.term)}</td><td>${fmt(x.df)}</td><td>${idfOf(x.df, n).toFixed(2)}</td></tr>`).join("")}</table>
+      <p>df = chunks containing the term. The rare “${esc(terms[0].term)}” weighs far more than the common “${esc(terms[terms.length - 1].term)}”.</p>`;
+    } },
+  { on: ["retrieve"], ms: 10000, phase: "Online · 4", title: "Score every chunk, keep the top 5", panel: ["retrieve", "matrix"],
+    body: c => {
+      const r = c.t.retrieve, max = Math.max(...r.hits.map(h => h.score), 1e-9);
+      return `<p>Score of a chunk = sum of its cells in those columns. Computed for all <b>${fmt(r.scored)}</b> chunks in <b>${fms(r.score_ms)}</b>; ${fmt(r.matched)} have a score above 0.</p>
+      <div class="thits">${r.hits.map((h, i) => `<div><span class="tn">${i + 1}</span><span class="wbar" style="width:${(h.score / max * 70).toFixed(0)}px"></span><b>${h.score.toFixed(1)}</b> <code>${esc(short(h.file_path))}</code> <small>${fmt(h.first_character_index)}–${fmt(h.last_character_index)}</small></div>`).join("")}</div>
+      <p>This list of addresses is already the answer of <code>search</code>.</p>`;
+    } },
+  { on: ["augment"], links: [["retrieve", "augment"]], ms: 9000, phase: "Online · 5", title: "Augment: addresses → text → prompt", panel: ["augment", "data"],
+    body: c => {
+      const a = c.t.augment;
+      return `<p>The index has no text, so Augment cuts each span out of <code>data/raw</code> and adds the blocks in rank order while they fit in <b>${fmt(a.budget)}</b> Qwen tokens.</p>
+      <div class="thits">${a.blocks.map(b => `<div><span class="tn">${b.n}</span><code>${esc(short(b.file_path))}</code> <small>${fmt(b.tokens)} tokens</small> ${b.kept ? "✓" : "<span class='tk drop'>does not fit</span>"}</div>`).join("")}</div>
+      <p>Prompt = system rules + these blocks + the question = <b>${fmt(a.prompt_tokens)}</b> tokens.</p>`;
+    } },
+  { on: ["llm"], links: [["augment", "llm"]], ms: 7000, waitGen: true, phase: "Online · 6", title: "Qwen3-0.6B writes the answer", panel: ["llm", "data"],
+    body: c => c.g ? `<p>Generated on ${esc(c.g.device)} in <b>${fms(c.g.ms)}</b>${c.g.load_ms ? ` (+ ${fms(c.g.load_ms)} to load the weights)` : ""}. The model only sees the prompt: it answers from the retrieved vLLM docs, not from memory.</p><div class="answer tans">${esc(c.g.answer)}</div>`
+      : c.gerr ? `<p class="err">${esc(c.gerr)}</p>` : `<p>The prompt goes into the model, which generates up to 256 new tokens on the CPU…</p><p class="tload">generating</p>` },
+  { on: ["output"], links: [["llm", "output"]], ms: 8000, phase: "Online · 7", title: "JSON out", panel: ["output", "data"],
+    body: c => `<p>Answer + sources, validated by pydantic (<code>MinimalAnswer</code>): the format the grader reads.</p>
+      <pre class="code">${jsonHl(JSON.stringify(c.g ? c.g.output : { question_id: "query", question: c.q, retrieved_sources: c.t.sources.slice(0, 2) }, null, 1).slice(0, 900))}</pre>` },
+  { on: [], ms: 0, phase: "Done", title: "That is the whole RAG",
+    body: () => `<p class="tq">question → tokenize → columns of W → top-k addresses → text from data/raw → prompt → Qwen3 → JSON</p>
+      <p>Click any cube to explore that stage, or type another question and press Run.</p>` },
+];
+
+function tourLinks(upto) {
+  Object.values(linkEls).forEach(p => p.classList.remove("lit"));
+  for (let j = 0; j < upto; j++) (TOUR_STEPS[j].links || []).forEach(([a, b]) => linkEls[a + ">" + b] && linkEls[a + ">" + b].classList.add("lit"));
+}
+function tourStatus(i) {
+  state.status = {};
+  for (let j = 0; j < i; j++) TOUR_STEPS[j].on.forEach(id => { state.status[id] = "done"; });
+  TOUR_STEPS[i].on.forEach(id => { state.status[id] = "active"; });
+  paintAll();
+}
+function tourCard() {
+  const s = TOUR_STEPS[tour.i], last = tour.i === TOUR_STEPS.length - 1;
+  tourEl.innerHTML = `<div class="tbar">${TOUR_STEPS.map((_, j) => `<button type="button" class="tdot ${j < tour.i ? "done" : j === tour.i ? "on" : ""}" data-tgo="${j}" aria-label="Step ${j + 1}"></button>`).join("")}</div>
+    <div class="kicker">${esc(s.phase)} · step ${tour.i + 1} of ${TOUR_STEPS.length}</div>
+    <h2>${esc(s.title)}</h2>
+    <div class="tbody">${tour.ctx ? s.body(tour.ctx) : `<p class="tload">Running the question through the real index</p>`}</div>
+    <div class="tctl">
+      <button class="btn ghost" type="button" data-tcmd="prev" ${tour.i ? "" : "disabled"}>← Back</button>
+      ${last ? `<button class="btn ghost" type="button" data-tcmd="restart">↺ Again</button>` : `<button class="btn ghost" type="button" data-tcmd="auto" ${tour.ctx ? "" : "disabled"}>${tour.auto ? "⏸ Pause" : "▶ Auto"}</button>`}
+      ${last ? `<button class="btn" type="button" data-tcmd="close">Close</button>` : `<button class="btn" type="button" data-tcmd="next" ${tour.ctx ? "" : "disabled"}>Next →</button>`}
+      <button class="btn ghost tx" type="button" data-tcmd="close" aria-label="Close the tour">✕</button>
+    </div>`;
+}
+async function tourGo(i, animate = true) {
+  const token = ++tour.token;
+  clearTimeout(tour.timer);
+  tour.i = Math.max(0, Math.min(TOUR_STEPS.length - 1, i));
+  const s = TOUR_STEPS[tour.i], c = tour.ctx;
+  tourStatus(tour.i); tourLinks(tour.i); tourCard();
+  if (s.panel) select(...s.panel);
+  if (s.vocab && state.vocab.term !== s.vocab) loadVocab(s.vocab, s.vocab.slice(0, 4));
+  if (s.panel && s.panel[1] === "matrix") { const top = c.t.retrieve.hits[0]; if (top && state.mrow !== top.row) loadMatrix(top.row); }
+  for (const [a, b] of (animate ? s.links || [] : [])) {
+    await travel(a, b, 700);
+    if (token !== tour.token) return;
+  }
+  (s.links || []).forEach(([a, b]) => linkEls[a + ">" + b] && linkEls[a + ">" + b].classList.add("lit"));
+  if (s.waitGen && !c.g && !c.gerr) {
+    await c.gp;
+    if (token !== tour.token) return;
+    state.gen = c.g || null; tourCard(); renderPanel();
+  }
+  tourSchedule();
+}
+function tourSchedule() {
+  clearTimeout(tour.timer);
+  const s = TOUR_STEPS[tour.i];
+  if (tour.on && tour.auto && s.ms && tour.i < TOUR_STEPS.length - 1)
+    tour.timer = setTimeout(() => tourGo(tour.i + 1), reduced ? s.ms * 2 : s.ms);
+}
+async function tourStart() {
+  if (state.running) return;
+  tourStop(false);
+  tour.on = true; tour.auto = true; tour.i = 0; tour.ctx = null;
+  if (state.backend !== "native") $('.seg button[data-b="native"]').click();
+  qInput.value = TOUR_Q; kSel.value = String(TOUR_K);
+  tourEl.hidden = false; tourBtn.setAttribute("aria-pressed", "true");
+  tourCard();
+  tourEl.scrollIntoView({ block: "nearest", behavior: reduced ? "auto" : "smooth" });
+  try {
+    const t = await api("/trace", { query: TOUR_Q, k: TOUR_K, backend: "native" });
+    const top = t.retrieve.hits[0];
+    const m = await api(`/matrix?row=${top ? top.row : 0}`);
+    if (!state.stats) state.stats = await api("/stats");
+    const ctx = { q: TOUR_Q, t, m, s: state.stats.native, g: null, gerr: null };
+    ctx.gp = api("/generate", { query: TOUR_Q, sources: t.sources })
+      .then(g => { ctx.g = g; if (tour.ctx === ctx) { state.gen = g; state.timings.llm = g.ms; paintAll(); } })
+      .catch(e => { ctx.gerr = e.message; });
+    state.trace = t; state.timings = { tokenize: t.tokenize.ms, retrieve: t.retrieve.score_ms, augment: t.augment.ms };
+    tour.ctx = ctx;
+    if (tour.on) tourGo(0);
+  } catch (e) {
+    tourEl.innerHTML = `<p class="err">${esc(e.message)}</p><button class="btn ghost" type="button" data-tcmd="close">Close</button>`;
+  }
+}
+function tourStop(hide = true) {
+  tour.on = false; tour.token++; clearTimeout(tour.timer);
+  if (hide) { tourEl.hidden = true; tourBtn.setAttribute("aria-pressed", "false"); }
+}
+tourBtn.addEventListener("click", () => (tour.on ? tourStop() : tourStart()));
+tourEl.addEventListener("click", e => {
+  const go = e.target.closest("[data-tgo]");
+  if (go && tour.ctx) { tour.auto = false; tourGo(Number(go.dataset.tgo), false); return; }
+  const b = e.target.closest("[data-tcmd]");
+  if (!b) return;
+  const cmd = b.dataset.tcmd;
+  if (cmd === "close") tourStop();
+  else if (cmd === "restart") { tour.auto = true; tourGo(0); }
+  else if (!tour.ctx) return;
+  else if (cmd === "next") { tour.auto = false; tourGo(tour.i + 1); }
+  else if (cmd === "prev") { tour.auto = false; tourGo(tour.i - 1, false); }
+  else if (cmd === "auto") { tour.auto = !tour.auto; tourCard(); tourSchedule(); }
+});
+document.addEventListener("keydown", e => {
+  if (!tour.on || !tour.ctx || e.target.matches("input, textarea, select")) return;
+  if (e.key === "ArrowRight") { tour.auto = false; tourGo(tour.i + 1); }
+  else if (e.key === "ArrowLeft") { tour.auto = false; tourGo(tour.i - 1, false); }
+  else if (e.key === "Escape") tourStop();
+});
+
+/* ---------- MCP session ---------- */
+const mcpBtn = $("#mcpRun"), mcpSeq = $("#mcpSeq"), mcpDetail = $("#mcpDetail");
+const mcp = { data: null, sel: -1, playing: false };
+const shortPath = p => String(p).replace("data/raw/vllm-0.10.1/", "");
+function mcpLabel(m, reqs) {
+  const j = m.json || {};
+  if (m.dir === "out") {
+    if (j.method === "tools/call") {
+      const a = j.params.arguments, args = Object.entries(a).map(([k, v]) => `${k}=${JSON.stringify(typeof v === "string" ? shortPath(v) : v)}`).join(", ");
+      return `<b>tools/call</b> ${esc(j.params.name)}(${esc(args)})`;
+    }
+    return `<b>${esc(j.method)}</b>${j.id == null ? " <span style='color:var(--muted)'>(notification)</span>" : ""}`;
+  }
+  const req = reqs[m.reply_to] || {}, r = j.result || {};
+  if (j.error) return `<b>error</b> ${esc(j.error.message)}`;
+  if (req.method === "initialize") return `<b>result</b> server ${esc(r.serverInfo && r.serverInfo.name)} · protocol ${esc(r.protocolVersion)} · instructions`;
+  if (req.method === "tools/list") return `<b>result</b> ${r.tools.length} tools: ${r.tools.map(t => esc(t.name)).join(", ")} + JSON schemas`;
+  if (r.isError) return `<b>isError</b> ${esc((r.content[0] || {}).text || "")}`;
+  const sc = r.structuredContent || {};
+  if (Array.isArray(sc.result)) return `<b>result</b> ${sc.result.length} hits: ${sc.result.slice(0, 3).map(h => esc(shortPath(h.file_path).split("/").pop()) + ` [${h.first_character_index}:${h.last_character_index}]`).join(", ")}`;
+  if (sc.text != null) return `<b>result</b> ${sc.end - sc.start} chars of ${esc(shortPath(sc.file_path).split("/").pop())} [${sc.start}:${sc.end}]`;
+  return "<b>result</b>";
+}
+function mcpActs(m, reqs) {
+  const j = m.json || {}, req = reqs[m.reply_to] || {};
+  if (m.dir === "out" && j.method === "initialize") return ["spawn child process", "starts (imports)"];
+  if (m.dir === "out" && j.method === "tools/list") return ["schemas → model context", ""];
+  if (m.dir === "out" && j.method === "tools/call") return [j.params.name === "search_vllm" ? "model: “let me search”" : String(j.params.arguments.file_path).startsWith("..") ? "model: a wrong path" : "model: “read more”", ""];
+  if (m.dir === "in" && req.method === "tools/call") {
+    const r = j.result || {};
+    if (r.isError) return ["model reads the reason", { bad: "RagError → ToolError" }];
+    return ["result → model context", req.params.name === "search_vllm" ? "BM25 search (index loads on 1st call)" : "reads file span"];
+  }
+  return ["", ""];
+}
+function mcpRender(upto) {
+  const d = mcp.data; if (!d) return;
+  const reqs = {}; d.messages.forEach(m => { if (m.dir === "out" && m.json && m.json.id != null) reqs[m.json.id] = m.json; });
+  const act = a => !a ? "" : typeof a === "string" ? `<span class="act">${esc(a)}</span>` : `<span class="act bad">${esc(a.bad)}</span>`;
+  let rows = "";
+  d.messages.slice(0, upto).forEach((m, i) => {
+    if (m.dir === "end") { rows += `<div class="seqend">${esc(m.note)} · t+${m.t} ms</div>`; return; }
+    const [ca, sa] = mcpActs(m, reqs), r = (m.json || {}).result || {};
+    const cls = ["msg", m.dir, r.isError ? "err" : "", m.json && m.json.id == null ? "note" : "", i === mcp.sel ? "sel" : ""].join(" ");
+    rows += `<div class="lane">${act(ca)}</div>
+      <div class="${cls}" data-i="${i}" tabindex="0" role="button" aria-label="Show message ${i + 1}">
+        <div class="lbl">${mcpLabel(m, reqs)}</div><div class="arrow"></div>
+        <div class="sub"><span>${esc(m.note || (m.dir === "in" ? "reply to id " + m.reply_to : ""))}</span><span>t+${m.t} ms · ${m.bytes} B</span></div>
+      </div><div class="lane">${act(sa)}</div>`;
+  });
+  mcpSeq.innerHTML = `<div class="seqin">
+    <div class="seqhd">MCP client<small>here: the engine</small></div>
+    <div class="seqhd wire">stdin →  · ← stdout (one JSON per line)</div>
+    <div class="seqhd">MCP server<small>${esc(d.command)}</small></div>${rows}</div>`;
+}
+function mcpShow(i) {
+  const d = mcp.data, m = d && d.messages[i]; if (!m || m.dir === "end") return;
+  mcp.sel = i;
+  mcpSeq.querySelectorAll(".msg").forEach(el => el.classList.toggle("sel", Number(el.dataset.i) === i));
+  const who = m.dir === "out" ? "client → server (stdin)" : "server → client (stdout)";
+  mcpDetail.innerHTML = `<div class="kicker">Message ${i + 1} of ${d.messages.length - 1} · ${who}</div>
+    ${kv([["Time", `t+${m.t} ms after spawn`], ["Size", `${m.bytes} bytes on the wire`], ["Kind", m.json.id == null ? "notification (no reply)" : m.dir === "out" ? `request, id ${m.json.id}` : `response to id ${m.reply_to}`]])}
+    <pre>${esc(JSON.stringify(m.json, null, 2))}</pre>
+    <p style="color:var(--muted);font-size:12px;margin:4px 0 0">Strings over 700 characters are clipped for display; the real line carried them in full. A tool result arrives twice: <code>content</code> (text for any client) and <code>structuredContent</code> (validated against the tool's output schema).</p>`;
+}
+async function mcpRecord() {
+  if (mcp.playing) return;
+  const query = qInput.value.trim();
+  if (!query) { qInput.focus(); return; }
+  mcp.playing = true; mcpBtn.disabled = true; mcpBtn.textContent = "Recording…";
+  mcpSeq.innerHTML = `<div class="mcpempty">Starting <code>python -m src.extra.mcp_server</code> and talking to it…</div>`; mcpDetail.innerHTML = "";
+  try {
+    mcp.data = await api("/mcp", { query, k: Number(kSel.value) });
+    mcp.sel = -1;
+    const n = mcp.data.messages.length;
+    for (let i = 1; i <= n; i++) {
+      mcpRender(i);
+      if (mcp.data.messages[i - 1].dir !== "end") mcpShow(i - 1);
+      await wait(700);
+    }
+    mcpShow(mcp.data.messages.findIndex(m => m.json && m.json.result && m.json.result.structuredContent));
+  } catch (err) {
+    mcpSeq.innerHTML = `<div class="mcpempty" style="color:var(--bad)">${esc(err.message)}</div>`;
+  } finally {
+    mcp.playing = false; mcpBtn.disabled = false; mcpBtn.textContent = "▶ Record an MCP session";
+  }
+}
+mcpBtn.addEventListener("click", mcpRecord);
+mcpSeq.addEventListener("click", e => { const el = e.target.closest(".msg"); if (el && !mcp.playing) mcpShow(Number(el.dataset.i)); });
+mcpSeq.addEventListener("keydown", e => { const el = e.target.closest(".msg"); if (el && (e.key === "Enter" || e.key === " ") && !mcp.playing) { e.preventDefault(); mcpShow(Number(el.dataset.i)); } });
+
+buildPipeline();
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { fitViewBox(pipe); buildDocker(state.health); });
+renderPanel();
+refreshHealth();
+loadStats();
+loadInside();
+})();
+</script>
+</body>
+</html>

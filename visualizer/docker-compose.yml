@@ -1,0 +1,37 @@
+name: rag-visualizer
+
+services:
+  rag-engine:
+    build:
+      context: ./engine
+      additional_contexts:
+        project: ..
+    image: rag-visualizer/engine:1.0
+    container_name: rag-engine
+    working_dir: /app/project
+    volumes:
+      - ..:/app/project:ro
+      - ${HOME}/.cache/huggingface:/root/.cache/huggingface
+    expose:
+      - "8000"            # reachable only inside rag-net
+    networks:
+      - rag-net
+
+  viz:
+    image: nginx:1.27-alpine
+    container_name: rag-viz
+    volumes:
+      - ./viz/index.html:/usr/share/nginx/html/index.html:ro
+      - ./viz/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "8080:80"
+    depends_on:
+      rag-engine:
+        condition: service_healthy
+    networks:
+      - rag-net
+
+networks:
+  rag-net:
+    name: rag-net
+    driver: bridge
