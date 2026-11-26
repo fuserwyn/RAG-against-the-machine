@@ -17,7 +17,6 @@ ps:
 	docker compose ps
 	docker network inspect rag-net --format '{{range .Containers}}{{.Name}} {{.IPv4Address}}{{"\n"}}{{end}}'
 
-## no Docker: run the trace server with the project's uv env and serve the UI on :8080
+## no Docker: same detached server as `make local` in the repository root
 local:
-	cd .. && PYTHONPATH=. uv run python visualizer/engine/trace_server.py \
-		--host 127.0.0.1 --port 8080 --static visualizer/viz
+	$(MAKE) -C .. local

@@ -9,7 +9,8 @@ Every command below is run from the repository root, same place as `make school`
 ```bash
 make up      # Docker: build and start rag-engine + rag-viz, then open http://127.0.0.1:8080
 make down
-make local   # no Docker: same server in the project's uv env, http://127.0.0.1:8080
+make local       # no Docker: same server in the project's uv env, http://127.0.0.1:8080
+make local-stop  # stop the server started by `make local`
 ```
 
 Index the backends you want to show first:

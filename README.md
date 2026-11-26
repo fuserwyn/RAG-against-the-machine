@@ -80,7 +80,7 @@ Makefile rules:
 | `make index` / `search` / `evaluate` / `answer` | single pipeline steps |
 | `make update` | incremental re-index of the changed files (bonus) |
 | `make serve` | local HTTP API on `http://127.0.0.1:$(PORT)` (bonus) |
-| `make local` | pipeline visualizer, no Docker, `http://127.0.0.1:8080` |
+| `make local` / `local-stop` | pipeline visualizer in the background, `http://127.0.0.1:8080` |
 | `make up` / `down` | same visualizer in Docker |
 | `make compare` | `run` with both backends |
 | `make run MODE=semantic` / `MODE=hybrid` | build embeddings too and search with them (bonus) |
@@ -158,7 +158,8 @@ the MCP server and replays every JSON-RPC line it exchanged). It runs as two Doc
 
 ```bash
 make up      # Docker, then open http://127.0.0.1:8080
-make local   # same thing without Docker
+make local       # same thing without Docker; the shell stays free
+make local-stop  # stop that server
 ```
 
 It is not part of the graded pipeline; see `visualizer/README.md`.

@@ -18,7 +18,7 @@ INDEX_FLAGS = $(if $(filter semantic hybrid,$(MODE)),--semantic,)
 
 .PHONY: install run debug clean lint lint-strict index update search \
 	evaluate answer compare serve test test-fast school purge \
-	local up down logs rebuild ps
+	local local-stop up down logs rebuild ps
 
 install:
 	uv sync
@@ -75,10 +75,42 @@ serve:
 	$(CLI) serve --port $(PORT)
 
 ## pipeline visualizer, no Docker: http://127.0.0.1:8080
+## returns the shell; the server keeps running
 local:
-	@echo "open http://127.0.0.1:8080"
-	PYTHONPATH=. $(PY) visualizer/engine/trace_server.py \
-		--host 127.0.0.1 --port 8080 --static visualizer/viz
+	@mkdir -p data/output
+	@pid=data/output/visualizer.pid; log=data/output/visualizer.log; \
+	if [ -f $$pid ] && kill -0 $$(cat $$pid) 2>/dev/null; then \
+		echo "already running, open http://127.0.0.1:8080"; \
+		exit 0; \
+	fi; \
+	rm -f $$log; \
+	PYTHONPATH=. python3 -c 'import os; os.setsid(); os.execvp("uv", ["uv", "run", "python", "visualizer/engine/trace_server.py", "--host", "127.0.0.1", "--port", "8080", "--static", "visualizer/viz"])' \
+		> $$log 2>&1 < /dev/null & \
+	echo $$! > $$pid; \
+	i=0; \
+	while [ $$i -lt 50 ]; do \
+		grep -q "serving on" $$log 2>/dev/null && break; \
+		kill -0 $$(cat $$pid) 2>/dev/null || break; \
+		i=$$((i + 1)); sleep 0.2; \
+	done; \
+	if grep -q "serving on" $$log 2>/dev/null; then \
+		echo "open http://127.0.0.1:8080"; \
+		echo "terminal is free.  log: $$log    stop: make local-stop"; \
+	else \
+		echo "visualizer did not start. last lines of $$log:"; \
+		tail -n 20 $$log; \
+		exit 1; \
+	fi
+
+local-stop:
+	@pid=data/output/visualizer.pid; \
+	if [ ! -f $$pid ]; then echo "not running"; exit 0; fi; \
+	p=$$(cat $$pid); \
+	kill -TERM -$$p 2>/dev/null || kill $$p 2>/dev/null || true; \
+	sleep 0.3; \
+	kill -KILL -$$p 2>/dev/null || true; \
+	rm -f $$pid; \
+	echo "stopped"
 
 ## same visualizer in Docker (compose file stays in visualizer/)
 up:
